@@ -1,0 +1,11 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for DMS Sync",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:allow-open",
+    "autostart:default",
+    "dialog:default"
+  ]
+}
