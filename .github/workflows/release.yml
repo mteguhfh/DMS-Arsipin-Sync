@@ -67,13 +67,17 @@ jobs:
             libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev
 
-      # ── macOS code signing (hanya jika secret tersedia) ──
+      # ── macOS code signing (otomatis skip kalo secret gak ada) ──
       - name: Import Apple Developer certificate
-        if: runner.os == 'macOS' && secrets.APPLE_CERTIFICATE != ''
+        if: runner.os == 'macOS'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "No Apple certificate configured, skipping signing"
+            exit 0
+          fi
           echo "$APPLE_CERTIFICATE" | base64 --decode > /tmp/apple.p12
           security create-keychain -p temp temp.keychain
           security default-keychain -s temp.keychain
