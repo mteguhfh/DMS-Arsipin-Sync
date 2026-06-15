@@ -9,6 +9,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Izinkan tauri-action bikin GitHub Release + upload artifacts
+permissions:
+  contents: write
+
 jobs:
   # ─── Cross-platform build & release ───────────────────────────────
   publish:
