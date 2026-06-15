@@ -10,51 +10,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ─── PR build check (quick) ───────────────────────────────────────
-  verify:
-    name: Verify build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "lts/*"
-          cache: npm
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install Linux deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            libgtk-3-dev \
-            libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev
-
-      - name: Install npm deps
-        run: npm ci
-
-      - name: Build frontend
-        run: npm run build
-
-      - name: Cargo check
-        run: cargo check --manifest-path src-tauri/Cargo.toml
-
   # ─── Cross-platform build & release ───────────────────────────────
   publish:
     name: Publish (${{ matrix.settings.name }})
-    needs: verify
     runs-on: ${{ matrix.settings.os }}
     strategy:
       fail-fast: false
@@ -109,9 +67,9 @@ jobs:
             libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev
 
-      # ── macOS code signing (optional) ──
+      # ── macOS code signing (hanya jika secret tersedia) ──
       - name: Import Apple Developer certificate
-        if: runner.os == 'macOS' && env.APPLE_CERTIFICATE != ''
+        if: runner.os == 'macOS' && secrets.APPLE_CERTIFICATE != ''
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -132,15 +90,11 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
-      # ── Build with Tauri ──
+      # ── Build dengan Tauri ──
       - name: Build & release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: v__VERSION__
           releaseName: "DMS Sync v__VERSION__"
