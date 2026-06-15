@@ -739,6 +739,7 @@ name = "dms-sync"
 version = "1.0.0"
 dependencies = [
  "chrono",
+ "dirs 6.0.0",
  "env_logger",
  "hex",
  "log",

@@ -175,7 +175,7 @@ export default function Dashboard({ status }: Props) {
             type="text"
             value={folderInput}
             onChange={(e) => setFolderInput(e.target.value)}
-            placeholder="C:\Users\...\MySyncFolder"
+            placeholder={navigator.platform?.includes('Win') ? 'C:\\Users\\...\\MySyncFolder' : '/Users/.../MySyncFolder'}
             className="folder-input"
           />
           <button onClick={handleBrowse} className="browse-btn">Browse</button>
@@ -193,7 +193,7 @@ export default function Dashboard({ status }: Props) {
           {logs.length === 0 && <p className="empty">No sync activity yet</p>}
           {[...logs].reverse().map((log, i) => (
             <div key={i} className={`log-item ${log.status}`}>
-              <span className="log-file">{log.file_path.split('\\').pop()}</span>
+              <span className="log-file">{log.file_path.split(/[/\\]/).pop()}</span>
               <span className="log-status">{log.status}</span>
               <span className="log-folder">folder: {log.folder_path || '(root)'}</span>
               {log.error && <span className="log-error">{log.error}</span>}

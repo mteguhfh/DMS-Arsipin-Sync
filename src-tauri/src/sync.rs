@@ -57,48 +57,65 @@ impl SyncEngine {
     }
 
     pub fn relative_path(root: &str, full_path: &str, events: &mut Vec<String>) -> String {
-        // Normalize: trim trailing separators, use backslashes, lowercase for case-insensitive compare
-        let root_norm = root.trim_end_matches(&['/', '\\', ' '][..]).replace('/', "\\");
-        let full_norm = full_path.replace('/', "\\");
-        let root_lower = root_norm.to_lowercase();
-        let full_lower = full_norm.to_lowercase();
+        // Normalize root: trim trailing separators
+        let root_trimmed = root.trim_end_matches(&['/', '\\', ' '][..]);
+        let root_path = Path::new(root_trimmed);
+        let full = Path::new(full_path);
 
-        events.push(format!("relative_path: root_norm=[{}] full_norm=[{}]", root_norm, full_norm));
+        events.push(format!(
+            "relative_path: root=[{}] full=[{}]",
+            root_path.display(),
+            full.display()
+        ));
 
-        // Try string-level prefix check (case-insensitive on Windows)
-        if full_lower.starts_with(&root_lower) {
-            let suffix = &full_norm[root_norm.len()..];
-            let suffix = suffix.trim_start_matches(&['/', '\\'][..]);
-            let result = suffix.replace('\\', "/");
+        // Try Path::strip_prefix first (cross-platform)
+        if let Ok(rel) = full.strip_prefix(root_path) {
+            let result = rel.to_string_lossy().replace('\\', "/");
             events.push(format!("relative_path OK: {}", result));
             return result;
         }
 
-        // Fallback: Path-based strip_prefix
-        let root_path = Path::new(&root_norm);
-        let full = Path::new(&full_norm);
-        match full.strip_prefix(root_path) {
-            Ok(rel) => {
-                let result = rel.to_string_lossy().replace('\\', "/");
-                events.push(format!("relative_path OK (path): {}", result));
-                result
-            }
-            Err(_) => {
-                // Last resort: just use filename
-                let result = full.file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                events.push(format!(
-                    "relative_path FAIL: root_lower=[{}] full_lower=[{}] starts_with={}",
-                    root_lower, full_lower, full_lower.starts_with(&root_lower)
-                ));
-                log::warn!(
-                    "relative_path FAIL: root_norm={} full_norm={} root={} full={} -> {}",
-                    root_norm, full_norm, root, full_path, result
-                );
-                result
+        // Fallback: manual prefix check
+        // On Windows, do case-insensitive comparison
+        // On macOS, APFS can be either case-sensitive or case-insensitive,
+        // but try case-insensitive as a fallback too
+        #[cfg(target_os = "windows")]
+        {
+            let root_str = root_path.to_string_lossy().to_lowercase();
+            let full_str = full.to_string_lossy().to_lowercase();
+            if full_str.starts_with(&root_str) {
+                let suffix = &full.to_string_lossy()[root_str.len()..];
+                let suffix = suffix.trim_start_matches(&['/', '\\'][..]);
+                let result = suffix.replace('\\', "/");
+                events.push(format!("relative_path OK (case-insensitive): {}", result));
+                return result;
             }
         }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let root_str = root_path.to_string_lossy();
+            let full_str = full.to_string_lossy();
+            if full_str.starts_with(root_str.as_ref()) {
+                let suffix = &full_str[root_str.len()..];
+                let suffix = suffix.trim_start_matches('/');
+                let result = suffix.to_string();
+                events.push(format!("relative_path OK (manual): {}", result));
+                return result;
+            }
+        }
+
+        // Last resort: just use filename
+        let result = full
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        events.push(format!("relative_path FAIL: root=[{}] full=[{}] -> {}", root, full_path, result));
+        log::warn!(
+            "relative_path FAIL: root={} full={} -> {}",
+            root, full_path, result
+        );
+        result
     }
 
     pub fn folder_path_from_relative(rel_path: &str) -> Option<String> {

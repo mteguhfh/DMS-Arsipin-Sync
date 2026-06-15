@@ -28,6 +28,7 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 
     let _tray = TrayIconBuilder::new()
         .icon(icon)
+        .icon_as_template(true)  // macOS: auto-adjust for light/dark menu bar
         .menu(&menu)
         .tooltip("DMS Sync")
         .on_menu_event(|app, event| {

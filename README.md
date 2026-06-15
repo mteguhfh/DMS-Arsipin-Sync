@@ -1,73 +1,115 @@
-# React + TypeScript + Vite
+# DMS Sync
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> Klien sinkronisasi desktop untuk Arsipin DMS — upload dokumen dari folder lokal secara otomatis.
 
-Currently, two official plugins are available:
+[![CI](https://github.com/arsipin/dms-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/arsipin/dms-sync/actions/workflows/ci.yml)
+[![Release](https://github.com/arsipin/dms-sync/actions/workflows/release.yml/badge.svg)](https://github.com/arsipin/dms-sync/actions/workflows/release.yml)
+[![Windows](https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white)](https://github.com/arsipin/dms-sync/releases)
+[![macOS Intel](https://img.shields.io/badge/macOS%20Intel-000000?logo=apple&logoColor=white)](https://github.com/arsipin/dms-sync/releases)
+[![macOS Silicon](https://img.shields.io/badge/macOS%20Silicon-000000?logo=apple&logoColor=white)](https://github.com/arsipin/dms-sync/releases)
+[![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)](https://github.com/arsipin/dms-sync/releases)
+[![Panduan Mac](https://img.shields.io/badge/Panduan-Mac-999?logo=apple)](README-MAC.md)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## Fitur
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- 🔄 **Sinkronisasi otomatis** — Pantau folder dan upload file baru/berubah ke DMS
+- 🔐 **Login berbasis session** — Login sekali, cookie tersimpan walau aplikasi ditutup
+- 🗂️ **Pemetaan folder** — Struktur folder lokal dipetakan ke folder DMS
+- 🖥️ **System tray** — Berjalan di latar belakang, bisa diakses dari menu bar
+- 🚀 **Multi-platform** — Berfungsi di Windows, macOS (Intel & Silicon), dan Linux
+- ⚡ **Deduplikasi file** — Lewati file yang sudah pernah diupload berdasarkan hash konten
 
-## Expanding the ESLint configuration
+## Unduh
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Ambil installer terbaru untuk platform kamu dari halaman [Releases](https://github.com/arsipin/dms-sync/releases).
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+| Platform | Format |
+|---|---|
+| Windows | `.msi` / `.exe` |
+| macOS Intel | `.dmg` (x86_64) |
+| macOS Silicon | `.dmg` (aarch64) |
+| Linux (Debian/Ubuntu) | `.deb` |
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### 🍎 Pengguna Mac?
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Lihat [panduan lengkap untuk Mac](README-MAC.md) — termasuk cara install, izin akses folder, code signing, dan dual-architecture.
+
+## Pengembangan
+
+### Prasyarat
+
+- [Node.js](https://nodejs.org) LTS
+- [Rust](https://rustup.rs) (via `rustup`)
+- [Dependensi sistem Tauri](https://v2.tauri.app/start/prerequisites/) sesuai platform kamu
+
+### Setup
+
+```bash
+# Install dependensi JS
+npm install
+
+# Jalankan mode dev (hot-reload)
+npm run tauri dev
+
+# Build untuk production
+npm run tauri build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Struktur Proyek
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+├── src/                  # Frontend React (TypeScript)
+│   ├── App.tsx
+│   ├── components/
+│   │   ├── Dashboard.tsx
+│   │   ├── LoginPage.tsx
+│   │   └── Settings.tsx
+│   └── index.css
+├── src-tauri/            # Backend Rust
+│   ├── src/
+│   │   ├── lib.rs        # Entry point aplikasi, perintah Tauri
+│   │   ├── api.rs        # Klien API DMS
+│   │   ├── config.rs     # Konfigurasi aplikasi (path lintas platform)
+│   │   ├── sync.rs       # Mesin sinkronisasi, antrian, hash file
+│   │   ├── watcher.rs    # Pemantau file system
+│   │   ├── tray.rs       # Menu system tray
+│   │   └── folder_cache.rs
+│   └── Cargo.toml
+├── .github/workflows/    # Pipeline CI/CD
+│   ├── ci.yml            # Lint, typecheck, build di setiap PR
+│   └── release.yml       # Build multi-platform saat tag di-push
+└── package.json
+```
+
+### Perintah
+
+| Perintah | Deskripsi |
+|---|---|
+| `npm run dev` | Jalankan Vite dev server |
+| `npm run build` | Build frontend saja |
+| `npm run lint` | ESLint check |
+| `npm run tauri dev` | Jalankan aplikasi mode dev |
+| `npm run tauri build` | Build aplikasi production |
+
+## CI/CD
+
+Push tag untuk memicu build rilis multi-platform:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+[Workflow Release](.github/workflows/release.yml) akan build untuk 4 target secara paralel:
+- Windows `.msi`
+- macOS Intel `.dmg`
+- macOS Silicon `.dmg`
+- Linux `.deb`
+
+Artifacts akan otomatis diupload ke draft GitHub Release.
+
+## Lisensi
+
+© Arsipin — Internal tool

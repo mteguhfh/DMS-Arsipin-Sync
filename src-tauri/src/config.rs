@@ -2,6 +2,17 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+fn config_dir() -> PathBuf {
+    let base = dirs::data_dir()
+        .or_else(|| dirs::home_dir())
+        .unwrap_or_else(|| PathBuf::from("."));
+    
+    // Windows:   C:\Users\Alice\AppData\Roaming\dms-sync
+    // macOS:     /Users/Alice/Library/Application Support/dms-sync
+    // Linux:     /home/alice/.local/share/dms-sync
+    base.join("dms-sync")
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FolderEntry {
     pub path: String,
@@ -45,8 +56,8 @@ impl Default for AppConfig {
 
 impl AppConfig {
     pub fn path() -> PathBuf {
-        let mut p = dirs_next().unwrap_or_else(|| PathBuf::from("."));
-        p.push("dms-sync-config.json");
+        let mut p = config_dir();
+        p.push("config.json");
         p
     }
 
@@ -73,9 +84,4 @@ impl AppConfig {
     }
 }
 
-fn dirs_next() -> Option<PathBuf> {
-    let dir = std::env::var("APPDATA")
-        .or_else(|_| std::env::var("HOME"))
-        .ok()?;
-    Some(PathBuf::from(dir))
-}
+
