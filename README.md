@@ -4,12 +4,12 @@
 
 <div align="center">
 
-[![CI](https://github.com/arsipin/dms-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/arsipin/dms-sync/actions/workflows/ci.yml)
-[![Release](https://github.com/arsipin/dms-sync/actions/workflows/release.yml/badge.svg)](https://github.com/arsipin/dms-sync/actions/workflows/release.yml)
-[![Windows](https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white)](https://github.com/arsipin/dms-sync/releases)
-[![macOS Intel](https://img.shields.io/badge/macOS%20Intel-000000?logo=apple&logoColor=white)](https://github.com/arsipin/dms-sync/releases)
-[![macOS Silicon](https://img.shields.io/badge/macOS%20Silicon-000000?logo=apple&logoColor=white)](https://github.com/arsipin/dms-sync/releases)
-[![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)](https://github.com/arsipin/dms-sync/releases)
+[![CI](https://github.com/mteguhfh/DMS-Arsipin-Sync/actions/workflows/ci.yml/badge.svg)](https://github.com/mteguhfh/DMS-Arsipin-Sync/actions/workflows/ci.yml)
+[![Release](https://github.com/mteguhfh/DMS-Arsipin-Sync/actions/workflows/release.yml/badge.svg)](https://github.com/mteguhfh/DMS-Arsipin-Sync/actions/workflows/release.yml)
+[![Windows](https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white)](https://github.com/mteguhfh/DMS-Arsipin-Sync/releases)
+[![macOS Intel](https://img.shields.io/badge/macOS%20Intel-000000?logo=apple&logoColor=white)](https://github.com/mteguhfh/DMS-Arsipin-Sync/releases)
+[![macOS Silicon](https://img.shields.io/badge/macOS%20Silicon-000000?logo=apple&logoColor=white)](https://github.com/mteguhfh/DMS-Arsipin-Sync/releases)
+[![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)](https://github.com/mteguhfh/DMS-Arsipin-Sync/releases)
 [![Panduan Mac](https://img.shields.io/badge/Panduan-Mac-999?logo=apple)](README-MAC.md)
 
 </div>
@@ -31,7 +31,7 @@
 
 ### Unduh Aplikasi
 
-Ambil installer terbaru untuk platform Anda dari halaman **[Releases](https://github.com/arsipin/dms-sync/releases)**.
+Ambil installer terbaru untuk platform Anda dari halaman **[Releases](https://github.com/mteguhfh/DMS-Arsipin-Sync/releases)**.
 
 | Platform | Format | Catatan |
 |:---:|:---:|---|
@@ -64,8 +64,8 @@ Sebelum memulai, pastikan Anda sudah install:
 
 ```bash
 # Clone repository
-git clone https://github.com/arsipin/dms-sync.git
-cd dms-sync
+git clone https://github.com/mteguhfh/DMS-Arsipin-Sync.git
+cd DMS-Arsipin-Sync
 
 # Install dependensi Node.js
 npm install
@@ -146,4 +146,3 @@ Artifacts akan otomatis diupload ke draft **GitHub Release** dan siap didistribu
 ## 📝 Lisensi
 
 © **Arsipin** — Internal Tool
-
