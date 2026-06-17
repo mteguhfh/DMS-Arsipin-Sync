@@ -1,6 +1,8 @@
-# DMS Sync
+# 📄 DMS Sync
 
 > Klien sinkronisasi desktop untuk Arsipin DMS — upload dokumen dari folder lokal secara otomatis.
+
+<div align="center">
 
 [![CI](https://github.com/arsipin/dms-sync/actions/workflows/ci.yml/badge.svg)](https://github.com/arsipin/dms-sync/actions/workflows/ci.yml)
 [![Release](https://github.com/arsipin/dms-sync/actions/workflows/release.yml/badge.svg)](https://github.com/arsipin/dms-sync/actions/workflows/release.yml)
@@ -10,47 +12,65 @@
 [![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black)](https://github.com/arsipin/dms-sync/releases)
 [![Panduan Mac](https://img.shields.io/badge/Panduan-Mac-999?logo=apple)](README-MAC.md)
 
+</div>
+
 ---
 
-## Fitur
+## ✨ Fitur Utama
 
-- 🔄 **Sinkronisasi otomatis** — Pantau folder dan upload file baru/berubah ke DMS
-- 🔐 **Login berbasis session** — Login sekali, cookie tersimpan walau aplikasi ditutup
-- 🗂️ **Pemetaan folder** — Struktur folder lokal dipetakan ke folder DMS
-- 🖥️ **System tray** — Berjalan di latar belakang, bisa diakses dari menu bar
-- 🚀 **Multi-platform** — Berfungsi di Windows, macOS (Intel & Silicon), dan Linux
-- ⚡ **Deduplikasi file** — Lewati file yang sudah pernah diupload berdasarkan hash konten
+- 🔄 **Sinkronisasi Otomatis** — Pantau folder dan upload file baru/berubah ke DMS secara real-time
+- 🔐 **Login Berbasis Session** — Login sekali, cookie tersimpan walau aplikasi ditutup
+- 🗂️ **Pemetaan Folder Cerdas** — Struktur folder lokal dipetakan otomatis ke folder DMS
+- 🖥️ **System Tray** — Berjalan di latar belakang, bisa diakses dari menu bar
+- 🚀 **Multi-Platform** — Berfungsi di Windows, macOS (Intel & Silicon), dan Linux
+- ⚡ **Deduplikasi File** — Lewati file yang sudah pernah diupload berdasarkan hash konten
 
-## Unduh
+---
 
-Ambil installer terbaru untuk platform kamu dari halaman [Releases](https://github.com/arsipin/dms-sync/releases).
+## 🚀 Memulai
 
-| Platform | Format |
-|---|---|
-| Windows | `.msi` / `.exe` |
-| macOS Intel | `.dmg` (x86_64) |
-| macOS Silicon | `.dmg` (aarch64) |
-| Linux (Debian/Ubuntu) | `.deb` |
+### Unduh Aplikasi
 
-### 🍎 Pengguna Mac?
+Ambil installer terbaru untuk platform Anda dari halaman **[Releases](https://github.com/arsipin/dms-sync/releases)**.
 
-Lihat [panduan lengkap untuk Mac](README-MAC.md) — termasuk cara install, izin akses folder, code signing, dan dual-architecture.
+| Platform | Format | Catatan |
+|:---:|:---:|---|
+| **Windows** | `.msi` / `.exe` | Installer otomatis |
+| **macOS Intel** | `.dmg` | x86_64 |
+| **macOS Silicon** | `.dmg` | aarch64 (Apple Silicon) |
+| **Linux** | `.deb` | Debian/Ubuntu |
 
-## Pengembangan
+#### 🍎 Pengguna Mac?
+
+Lihat **[Panduan Lengkap untuk Mac](README-MAC.md)** — termasuk:
+- Cara install dan setup
+- Izin akses folder (Full Disk Access)
+- Code signing dan notarization
+- Support dual-architecture
+
+---
+
+## 💻 Pengembangan
 
 ### Prasyarat
 
-- [Node.js](https://nodejs.org) LTS
-- [Rust](https://rustup.rs) (via `rustup`)
-- [Dependensi sistem Tauri](https://v2.tauri.app/start/prerequisites/) sesuai platform kamu
+Sebelum memulai, pastikan Anda sudah install:
 
-### Setup
+- **[Node.js](https://nodejs.org)** — LTS atau terbaru
+- **[Rust](https://rustup.rs)** — via `rustup`
+- **[Dependensi Sistem Tauri](https://v2.tauri.app/start/prerequisites/)** — sesuai platform Anda
+
+### Setup Proyek
 
 ```bash
-# Install dependensi JS
+# Clone repository
+git clone https://github.com/arsipin/dms-sync.git
+cd dms-sync
+
+# Install dependensi Node.js
 npm install
 
-# Jalankan mode dev (hot-reload)
+# Jalankan mode development (hot-reload)
 npm run tauri dev
 
 # Build untuk production
@@ -60,56 +80,70 @@ npm run tauri build
 ### Struktur Proyek
 
 ```
-├── src/                  # Frontend React (TypeScript)
-│   ├── App.tsx
+DMS-Arsipin-Sync/
+├── src/                          # Frontend React (TypeScript)
+│   ├── App.tsx                   # Komponen utama aplikasi
 │   ├── components/
-│   │   ├── Dashboard.tsx
-│   │   ├── LoginPage.tsx
-│   │   └── Settings.tsx
-│   └── index.css
-├── src-tauri/            # Backend Rust
+│   │   ├── Dashboard.tsx         # Dashboard sinkronisasi
+│   │   ├── LoginPage.tsx         # Halaman login
+│   │   └── Settings.tsx          # Pengaturan aplikasi
+│   └── index.css                 # Styling global
+│
+├── src-tauri/                    # Backend Rust
 │   ├── src/
-│   │   ├── lib.rs        # Entry point aplikasi, perintah Tauri
-│   │   ├── api.rs        # Klien API DMS
-│   │   ├── config.rs     # Konfigurasi aplikasi (path lintas platform)
-│   │   ├── sync.rs       # Mesin sinkronisasi, antrian, hash file
-│   │   ├── watcher.rs    # Pemantau file system
-│   │   ├── tray.rs       # Menu system tray
-│   │   └── folder_cache.rs
-│   └── Cargo.toml
-├── .github/workflows/    # Pipeline CI/CD
-│   ├── ci.yml            # Lint, typecheck, build di setiap PR
-│   └── release.yml       # Build multi-platform saat tag di-push
-└── package.json
+│   │   ├── lib.rs               # Entry point aplikasi & perintah Tauri
+│   │   ├── api.rs               # Klien API DMS
+│   │   ├── config.rs            # Konfigurasi aplikasi (lintas platform)
+│   │   ├── sync.rs              # Mesin sinkronisasi & antrian
+│   │   ├── watcher.rs           # Pemantau file system
+│   │   ├── tray.rs              # Menu system tray
+│   │   └── folder_cache.rs      # Cache folder
+│   └── Cargo.toml               # Dependensi Rust
+│
+├── .github/workflows/            # Pipeline CI/CD
+│   ├── ci.yml                   # Lint, typecheck, build
+│   └── release.yml              # Build multi-platform
+│
+└── package.json                  # Konfigurasi Node.js
 ```
 
-### Perintah
+### Perintah NPM
 
 | Perintah | Deskripsi |
 |---|---|
 | `npm run dev` | Jalankan Vite dev server |
 | `npm run build` | Build frontend saja |
-| `npm run lint` | ESLint check |
-| `npm run tauri dev` | Jalankan aplikasi mode dev |
+| `npm run lint` | Cek dengan ESLint |
+| `npm run tauri dev` | Jalankan aplikasi dalam mode dev |
 | `npm run tauri build` | Build aplikasi production |
 
-## CI/CD
+---
 
-Push tag untuk memicu build rilis multi-platform:
+## 🔄 CI/CD & Release
+
+### Trigger Release Otomatis
+
+Push git tag untuk memicu build rilis multi-platform:
 
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-[Workflow Release](.github/workflows/release.yml) akan build untuk 4 target secara paralel:
-- Windows `.msi`
-- macOS Intel `.dmg`
-- macOS Silicon `.dmg`
-- Linux `.deb`
+### Workflow Release
 
-Artifacts akan otomatis diupload ke draft GitHub Release.
+[Workflow Release](.github/workflows/release.yml) akan otomatis membangun untuk 4 target secara paralel:
 
-## Lisensi
+- ✅ Windows `.msi`
+- ✅ macOS Intel `.dmg`
+- ✅ macOS Silicon `.dmg`
+- ✅ Linux `.deb`
 
-© Arsipin — Internal tool
+Artifacts akan otomatis diupload ke draft **GitHub Release** dan siap didistribusikan.
+
+---
+
+## 📝 Lisensi
+
+© **Arsipin** — Internal Tool
+
