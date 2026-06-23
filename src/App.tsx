@@ -68,7 +68,7 @@ function App() {
         <aside className="sidebar">
           <div className="sidebar-header">
             <h3>DMS Sync</h3>
-            <p>v1.0.0 · {status?.last_email ? 'Terhubung' : 'Offline'}</p>
+            <p>v1.1.0 · {status?.last_email ? 'Terhubung' : 'Offline'}</p>
           </div>
           <nav className="sidebar-nav">
             <button

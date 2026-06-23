@@ -260,15 +260,14 @@ impl SyncEngine {
                 *status = SyncStatus::Syncing;
             }
 
-            let mut folder_path = Self::folder_path_from_relative(&item.relative_path);
+            let watched_root_name = Path::new(&item.watched_root)
+                .file_name()
+                .map(|n| n.to_string_lossy().replace('\\', "/"))
+                .unwrap_or_default();
 
-            // If file is at root of watched folder (no parent in relative path),
-            // use the watched folder's own name as the folderPath
-            if folder_path.is_none() {
-                folder_path = Path::new(&item.watched_root)
-                    .file_name()
-                    .map(|n| n.to_string_lossy().replace('\\', "/"));
-            }
+            let folder_path = Self::folder_path_from_relative(&item.relative_path)
+                .map(|sub| format!("{}/{}", watched_root_name, sub))
+                .or(Some(watched_root_name));
 
             let fp_for_log = folder_path.clone();
 
