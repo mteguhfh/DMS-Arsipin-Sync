@@ -217,23 +217,16 @@ pub fn run() {
         }
     }
 
-    // Start watcher for all saved folders, then store roots in engine
-    let mut file_watcher = watcher::FileWatcher::new(engine.clone());
+    // Load saved folders into engine (no tokio runtime needed yet — just data)
     {
-        let folders = config.watched_folders();
-        for folder in &folders {
-            if let Err(e) = file_watcher.add_watch(folder) {
-                log::warn!("Failed to start watcher for {}: {}", folder, e);
-            }
-        }
         let mut roots = engine.watched_roots.blocking_lock();
-        *roots = folders;
+        *roots = config.watched_folders();
     }
 
     let app_state = AppState {
         engine: engine.clone(),
         config: Arc::new(Mutex::new(config)),
-        watcher: Arc::new(Mutex::new(file_watcher)),
+        watcher: Arc::new(Mutex::new(watcher::FileWatcher::new(engine.clone()))),
     };
 
     tauri::Builder::default()

@@ -78,6 +78,23 @@ export default function Dashboard({ status }: Props) {
     return () => clearInterval(interval)
   }, [refresh])
 
+  // Auto-start watcher for saved folders on mount (backend loads roots, commands have tokio runtime)
+  useEffect(() => {
+    const saved = folders
+    if (saved.length > 0) {
+      ;(async () => {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core')
+          for (const folder of saved) {
+            // Silently ignore if already watching (duplicate handled by backend)
+            try { await invoke('add_watch_folder', { path: folder }) } catch {}
+          }
+          refresh()
+        } catch { /* watcher may already be started */ }
+      })()
+    }
+  }, [])
+
   // Refresh on mount
   useEffect(() => { refresh() }, [])
 
