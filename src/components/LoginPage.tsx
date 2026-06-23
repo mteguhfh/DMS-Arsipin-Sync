@@ -15,13 +15,12 @@ export default function LoginPage({ onLogin }: Props) {
     e.preventDefault()
     setLoading(true)
     setError('')
-
     try {
       const { invoke } = await import('@tauri-apps/api/core')
       await invoke('login', { email, password, serverUrl })
       onLogin()
     } catch (err: any) {
-      setError(typeof err === 'string' ? err : err.message || 'Login failed')
+      setError(typeof err === 'string' ? err : err.message || 'Login gagal')
     } finally {
       setLoading(false)
     }
@@ -30,7 +29,10 @@ export default function LoginPage({ onLogin }: Props) {
   return (
     <div className="login-container">
       <form onSubmit={handleSubmit} className="login-form">
-        <h2>Masuk ke DMS</h2>
+        <div className="login-header">
+          <h2>DMS Sync</h2>
+          <p>Masuk ke akun Arsipin DMS Anda</p>
+        </div>
 
         <label>
           Server URL
@@ -67,8 +69,8 @@ export default function LoginPage({ onLogin }: Props) {
 
         {error && <div className="error-msg">{error}</div>}
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Logging in...' : 'Login'}
+        <button type="submit" disabled={loading} className="btn-primary">
+          {loading ? 'Memproses...' : 'Masuk'}
         </button>
       </form>
     </div>

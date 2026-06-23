@@ -8,9 +8,7 @@ export default function Settings({ onLogout }: Props) {
   const [config, setConfig] = useState<any>(null)
   const [saved, setSaved] = useState(false)
 
-  useEffect(() => {
-    loadConfig()
-  }, [])
+  useEffect(() => { loadConfig() }, [])
 
   async function loadConfig() {
     try {
@@ -29,32 +27,49 @@ export default function Settings({ onLogout }: Props) {
     } catch { }
   }
 
-  if (!config) return <div className="settings">Loading...</div>
+  if (!config) return <div className="loading">Loading...</div>
+
+  const folders = config.watched_folders?.length > 0
+    ? config.watched_folders
+    : config.watched_folder
+      ? [config.watched_folder]
+      : []
 
   return (
     <div className="settings">
-      <div className="setting-group">
-        <h3>Account</h3>
-        <p>Logged in as: <strong>{config.last_email || 'Not logged in'}</strong></p>
-        <button className="danger-btn" onClick={onLogout}>Logout</button>
-      </div>
-
-      <div className="setting-group">
-        <h3>Sync</h3>
-        <p>Watched folder: <strong>{config.watched_folder || 'Not set'}</strong></p>
+      <div className="setting-card">
+        <h3>Akun</h3>
+        <p>Masuk sebagai: <strong>{config.last_email || 'Belum login'}</strong></p>
         <p>Server: {config.server_url}</p>
+        <button className="btn-danger" onClick={onLogout}>Logout</button>
       </div>
 
-      <div className="setting-group">
-        <h3>Maintenance</h3>
-        <button onClick={handleClearLog}>Clear Sync Log</button>
-        {saved && <span className="saved-msg">Cleared!</span>}
+      <div className="setting-card">
+        <h3>Folder yang Dipantau</h3>
+        {folders.length > 0 ? (
+          <div className="folder-list">
+            {folders.map((f: string, i: number) => (
+              <div key={i} className="folder-item" style={{ border: 'none', padding: '4px 0', cursor: 'default' }}>
+                <span className="folder-icon">📁</span>
+                <span className="folder-name" style={{ fontSize: '12px' }}>{f}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: '#64748b', fontStyle: 'italic', fontSize: '12px' }}>Belum ada folder</p>
+        )}
       </div>
 
-      <div className="setting-group about">
-        <h3>About</h3>
+      <div className="setting-card">
+        <h3>Perawatan</h3>
+        <button onClick={handleClearLog} className="btn-secondary">Hapus Log Sinkronisasi</button>
+        {saved && <span className="saved-msg">Dibersihkan!</span>}
+      </div>
+
+      <div className="setting-card about">
+        <h3>Tentang</h3>
         <p>DMS Sync v1.0.0</p>
-        <p>Desktop sync client for Arsipin DMS</p>
+        <p>Desktop sync client untuk Arsipin DMS</p>
       </div>
     </div>
   )

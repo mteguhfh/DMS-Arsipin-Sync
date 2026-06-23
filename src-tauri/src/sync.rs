@@ -15,6 +15,7 @@ pub struct QueuedFile {
     pub file_data: Vec<u8>,
     pub mime_type: String,
     pub file_hash: String,
+    pub watched_root: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -32,7 +33,7 @@ pub struct SyncEngine {
     pub logs: Arc<Mutex<Vec<SyncLogEntry>>>,
     pub folder_cache: Arc<Mutex<FolderCache>>,
     pub api: Arc<Mutex<Option<DmsApi>>>,
-    pub watched_root: Arc<Mutex<Option<String>>>,
+    pub watched_roots: Arc<Mutex<Vec<String>>>,
     pub watcher_events: Arc<Mutex<Vec<String>>>,
 }
 
@@ -45,7 +46,7 @@ impl SyncEngine {
             logs: Arc::new(Mutex::new(Vec::new())),
             folder_cache: Arc::new(Mutex::new(FolderCache::new())),
             api: Arc::new(Mutex::new(None)),
-            watched_root: Arc::new(Mutex::new(Option::None)),
+            watched_roots: Arc::new(Mutex::new(Vec::new())),
             watcher_events: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -155,7 +156,7 @@ impl SyncEngine {
         }
     }
 
-    pub async fn enqueue_file(&self, file_path: String, root: &str) {
+    pub async fn enqueue_file(&self, file_path: String) {
         // Track raw event for debugging
         {
             let mut ev = self.watcher_events.lock().await;
@@ -163,6 +164,29 @@ impl SyncEngine {
             if ev.len() > 500 { ev.remove(0); }
         }
         log::info!("enqueue_file called: {}", file_path);
+
+        // Find matching root (must match on directory boundary)
+        let root = {
+            let roots = self.watched_roots.lock().await;
+            roots.iter().find(|r| {
+                let r_trimmed = r.trim_end_matches(&['/', '\\', ' '][..]);
+                let fp_lower = file_path.to_lowercase();
+                let r_lower = r_trimmed.to_lowercase();
+                if !fp_lower.starts_with(&r_lower) { return false; }
+                let after = &fp_lower[r_lower.len()..];
+                after.is_empty() || after.starts_with('\\') || after.starts_with('/')
+            }).cloned()
+        };
+        let root = match root {
+            Some(r) => r,
+            None => {
+                let msg = format!("no matching root for: {}", file_path);
+                log::warn!("{}", msg);
+                let mut ev = self.watcher_events.lock().await;
+                ev.push(msg);
+                return;
+            }
+        };
 
         let data = tokio::fs::read(&file_path).await;
         if let Err(e) = data {
@@ -188,7 +212,7 @@ impl SyncEngine {
 
         let rel = {
             let mut ev = self.watcher_events.lock().await;
-            Self::relative_path(root, &file_path, &mut *ev)
+            Self::relative_path(&root, &file_path, &mut *ev)
         };
         let mime = Self::mime_from_ext(&file_path);
 
@@ -198,6 +222,7 @@ impl SyncEngine {
             file_data: data,
             mime_type: mime,
             file_hash: hash,
+            watched_root: root,
         };
 
         {
@@ -240,12 +265,9 @@ impl SyncEngine {
             // If file is at root of watched folder (no parent in relative path),
             // use the watched folder's own name as the folderPath
             if folder_path.is_none() {
-                let root = self.watched_root.lock().await;
-                if let Some(ref root_path) = *root {
-                    folder_path = Path::new(root_path)
-                        .file_name()
-                        .map(|n| n.to_string_lossy().replace('\\', "/"));
-                }
+                folder_path = Path::new(&item.watched_root)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().replace('\\', "/"));
             }
 
             let fp_for_log = folder_path.clone();

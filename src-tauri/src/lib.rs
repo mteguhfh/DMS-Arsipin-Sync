@@ -48,17 +48,18 @@ async fn login(
         *api_lock = Some(api);
     }
 
-    // Auto-start watcher if saved watched folder exists
-    let watched = {
+    // Start watcher for all saved watched folders (after login session restored)
+    let folders = {
         let config = state.config.lock().await;
-        config.watched_folder.clone()
+        config.watched_folders()
     };
-    if let Some(ref folder) = watched {
-        let folder = folder.trim_end_matches(&['/', '\\', ' '][..]);
+    {
         let mut watcher_lock = state.watcher.lock().await;
-        watcher_lock.stop();
-        if let Err(e) = watcher_lock.start_watching(folder) {
-            log::warn!("Failed to auto-start watcher: {}", e);
+        for folder in &folders {
+            let folder = folder.trim_end_matches(&['/', '\\', ' '][..]);
+            if let Err(e) = watcher_lock.add_watch(folder) {
+                log::warn!("Failed to start watcher for {}: {}", folder, e);
+            }
         }
     }
 
@@ -90,14 +91,14 @@ async fn get_status(state: tauri::State<'_, AppState>) -> Result<serde_json::Val
     };
     let queue_len = state.engine.queue.lock().await.len();
     let config = state.config.lock().await;
-    let watched = config.watched_folder.clone();
+    let watched_folders = config.watched_folders();
     let api_available = state.engine.api.lock().await.is_some();
     let event_count = state.engine.watcher_events.lock().await.len();
 
     Ok(serde_json::json!({
         "status": sync_status,
         "queue_length": queue_len,
-        "watched_folder": watched,
+        "watched_folders": watched_folders,
         "server_url": config.server_url,
         "last_email": config.last_email,
         "api_available": api_available,
@@ -112,28 +113,65 @@ async fn get_sync_log(state: tauri::State<'_, AppState>) -> Result<Vec<config::S
 }
 
 #[tauri::command]
-async fn set_watch_folder(state: tauri::State<'_, AppState>, path: String) -> Result<String, String> {
-    // Normalize path: remove trailing slashes, use native separators
+async fn add_watch_folder(state: tauri::State<'_, AppState>, path: String) -> Result<String, String> {
     let path = path.trim_end_matches(&['/', '\\', ' '][..]).to_string();
-    let engine = state.engine.clone();
 
+    // Check duplicate
     {
-        *engine.watched_root.lock().await = Some(path.clone());
+        let roots = state.engine.watched_roots.lock().await;
+        if roots.contains(&path) {
+            return Err("Folder already being watched".to_string());
+        }
     }
 
+    // Add to engine roots
+    {
+        let mut roots = state.engine.watched_roots.lock().await;
+        roots.push(path.clone());
+    }
+
+    // Start watching
     {
         let mut watcher_lock = state.watcher.lock().await;
-        watcher_lock.stop();
-        watcher_lock.start_watching(&path)?;
+        watcher_lock.add_watch(&path)?;
     }
 
+    // Save to config
     {
         let mut config = state.config.lock().await;
-        config.watched_folder = Some(path.clone());
+        if !config.watched_folders.contains(&path) {
+            config.watched_folders.push(path.clone());
+            config.save();
+        }
+    }
+
+    Ok(format!("Now watching: {}", path))
+}
+
+#[tauri::command]
+async fn remove_watch_folder(state: tauri::State<'_, AppState>, path: String) -> Result<String, String> {
+    let path = path.trim_end_matches(&['/', '\\', ' '][..]).to_string();
+
+    // Remove from watcher
+    {
+        let mut watcher_lock = state.watcher.lock().await;
+        watcher_lock.remove_watch(&path)?;
+    }
+
+    // Remove from engine roots
+    {
+        let mut roots = state.engine.watched_roots.lock().await;
+        roots.retain(|r| r != &path);
+    }
+
+    // Remove from config
+    {
+        let mut config = state.config.lock().await;
+        config.watched_folders.retain(|f| f != &path);
         config.save();
     }
 
-    Ok(format!("Watching: {}", path))
+    Ok(format!("Stopped watching: {}", path))
 }
 
 #[tauri::command]
@@ -179,10 +217,23 @@ pub fn run() {
         }
     }
 
+    // Start watcher for all saved folders, then store roots in engine
+    let mut file_watcher = watcher::FileWatcher::new(engine.clone());
+    {
+        let folders = config.watched_folders();
+        for folder in &folders {
+            if let Err(e) = file_watcher.add_watch(folder) {
+                log::warn!("Failed to start watcher for {}: {}", folder, e);
+            }
+        }
+        let mut roots = engine.watched_roots.blocking_lock();
+        *roots = folders;
+    }
+
     let app_state = AppState {
         engine: engine.clone(),
         config: Arc::new(Mutex::new(config)),
-        watcher: Arc::new(Mutex::new(watcher::FileWatcher::new(engine.clone()))),
+        watcher: Arc::new(Mutex::new(file_watcher)),
     };
 
     tauri::Builder::default()
@@ -203,7 +254,8 @@ pub fn run() {
             test_sync,
             get_status,
             get_sync_log,
-            set_watch_folder,
+            add_watch_folder,
+            remove_watch_folder,
             get_config,
             get_folder_cache,
             clear_sync_log,
