@@ -33,7 +33,7 @@ Tauri v2 desktop sync client (React 19 + TS frontend, Rust backend). Watches loc
 
 - Commit after every completed piece of work, before starting the next one. Do not leave verified changes uncommitted: each commit is a rollback point.
 - Commit only the files the task actually changed. Never `git add -A`; the working tree routinely carries CRLF-only diffs (see below) that would bloat the commit.
-- This repo's files use CRLF locally while the index stores LF, so `git status` often shows every touched file as fully rewritten. Check with `git diff --stat --ignore-all-space` before committing; if it is empty, the change is line endings only and must not be included.
+- `.gitattributes` enforces `eol=lf`. If `git status` shows a file as fully rewritten, check `git diff --stat --ignore-all-space`: an empty result means line endings only, so discard it (`git checkout -- <path>`) instead of committing.
 - Message style follows history: `type: short description` (`fix:`, `docs:`, `feat:`).
 
 ## Design decisions
