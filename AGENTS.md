@@ -36,6 +36,11 @@ Tauri v2 desktop sync client (React 19 + TS frontend, Rust backend). Watches loc
 - This repo's files use CRLF locally while the index stores LF, so `git status` often shows every touched file as fully rewritten. Check with `git diff --stat --ignore-all-space` before committing; if it is empty, the change is line endings only and must not be included.
 - Message style follows history: `type: short description` (`fix:`, `docs:`, `feat:`).
 
+## Design decisions
+
+- `docs/adr/` holds the rationale for non-obvious choices (Tauri, cookie auth, hash dedupe, folder mapping, config file, release flow). Read the relevant ADR before changing one of those areas.
+- A change that reverses an ADR needs a new ADR + `Superseded by` status on the old one, committed with the code change.
+
 ## Conventions
 
 - Rust error type is plain `Result<T, String>` with human-readable messages; keep it.
