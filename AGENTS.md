@@ -29,6 +29,13 @@ Tauri v2 desktop sync client (React 19 + TS frontend, Rust backend). Watches loc
 - Release: pushing a `v*` tag triggers `.github/workflows/release.yml` (4 targets, publishes the GitHub Release directly). macOS signing is skipped when `APPLE_CERTIFICATE` secret is absent.
 - Watcher skips extensions `tmp`, `temp`, `swp`, `~`, `part`, `crdownload`. MIME type is guessed purely from extension in `sync.rs::mime_from_ext`; unknown types become `application/octet-stream`.
 
+## Git workflow
+
+- Commit after every completed piece of work, before starting the next one. Do not leave verified changes uncommitted: each commit is a rollback point.
+- Commit only the files the task actually changed. Never `git add -A`; the working tree routinely carries CRLF-only diffs (see below) that would bloat the commit.
+- This repo's files use CRLF locally while the index stores LF, so `git status` often shows every touched file as fully rewritten. Check with `git diff --stat --ignore-all-space` before committing; if it is empty, the change is line endings only and must not be included.
+- Message style follows history: `type: short description` (`fix:`, `docs:`, `feat:`).
+
 ## Conventions
 
 - Rust error type is plain `Result<T, String>` with human-readable messages; keep it.
