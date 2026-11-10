@@ -196,7 +196,11 @@ jobs:
             sudo dpkg -i dms-sync_*.deb
             ```
           files: |
-            artifacts/*/*
+            artifacts/**/*.dmg
+            artifacts/**/*.msi
+            artifacts/**/*.exe
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
           fail_on_unmatched_files: true
           draft: false
           prerelease: false
