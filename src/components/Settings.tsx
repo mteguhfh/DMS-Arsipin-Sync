@@ -75,7 +75,7 @@ export default function Settings({ onLogout }: Props) {
 
       <div className="setting-card about">
         <h3>Tentang</h3>
-        <p>DMS Sync v1.1.0</p>
+        <p>Versi {__APP_VERSION__}</p>
         <p>Desktop sync client untuk Arsipin DMS</p>
       </div>
     </div>

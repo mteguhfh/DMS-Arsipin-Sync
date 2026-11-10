@@ -8,7 +8,7 @@ Panduan lengkap install, troubleshoot, dan develop DMS Sync di macOS (Intel & Ap
 
 ### 1. Unduh Installer
 
-Ambil file `.dmg` yang sesuai dari [halaman Releases](https://github.com/arsipin/dms-sync/releases):
+Ambil file `.dmg` yang sesuai dari [halaman Releases](https://github.com/mteguhfh/DMS-Arsipin-Sync/releases):
 
 | Mac kamu | Download |
 |---|---|
@@ -98,7 +98,7 @@ npm run tauri build
 
 Hasil build ada di:
 ```
-src-tauri/target/release/bundle/dmg/DMS Sync_1.0.0.dmg
+src-tauri/target/release/bundle/dmg/DMS Sync_<versi>.dmg
 ```
 
 ### Dual Architecture (Universal Binary)
@@ -150,7 +150,7 @@ codesign --force --options runtime --sign "$APPLE_SIGNING_IDENTITY" \
 
 # Notarize
 xcrun notarytool submit \
-  src-tauri/target/release/bundle/dmg/DMS\ Sync_1.0.0.dmg \
+  src-tauri/target/release/bundle/dmg/DMS\ Sync_<versi>.dmg \
   --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_PASSWORD"
 ```
 
