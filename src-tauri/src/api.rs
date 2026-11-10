@@ -27,7 +27,12 @@ pub struct LoginResponse {
 pub struct FolderResponse {
     pub id: String,
     pub name: String,
+    /// The DMS API sends `parentId`; older builds expected `parent_id`.
+    #[serde(default, alias = "parent_id")]
     pub parent_id: Option<String>,
+    /// Password-protected folders reject uploads without an unlock.
+    #[serde(default)]
+    pub has_password: bool,
 }
 
 pub struct DmsApi {

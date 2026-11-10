@@ -46,7 +46,7 @@ export default function Dashboard({ status }: Props) {
   const [watcherEvents, setWatcherEvents] = useState<string[]>([])
   const [showDebug, setShowDebug] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
-  const [dmsFolders, setDmsFolders] = useState<{ id: string; path: string }[]>([])
+  const [dmsFolders, setDmsFolders] = useState<{ id: string; path: string; locked: boolean }[]>([])
   const [targets, setTargets] = useState<Record<string, string>>({})
   const [folderError, setFolderError] = useState('')
 
@@ -284,10 +284,17 @@ export default function Dashboard({ status }: Props) {
                       Otomatis (pakai nama folder: {f.split(/[/\\]/).filter(Boolean).pop()})
                     </option>
                     {dmsFolders.map(d => (
-                      <option key={d.id} value={d.path}>{d.path}</option>
+                      <option key={d.id} value={d.path}>
+                        {d.path}{d.locked ? '  (terkunci)' : ''}
+                      </option>
                     ))}
                   </select>
                 </label>
+                {targets[f] && dmsFolders.find(d => d.path === targets[f])?.locked && (
+                  <p className="target-warn">
+                    Folder ini dilindungi password. Upload ke sini bisa ditolak server.
+                  </p>
+                )}
               </div>
             ))}
           </div>

@@ -387,6 +387,12 @@
   font-size: 11px;
   color: var(--text-muted);
 }
+.target-warn {
+  font-size: 10.5px;
+  color: var(--text-error);
+  padding-left: 24px;
+  margin-top: -2px;
+}
 .target-select {
   flex: 1;
   min-width: 0;

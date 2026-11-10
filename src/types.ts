@@ -37,10 +37,11 @@ export interface DmsFolder {
   id: string
   name: string
   parentId: string | null
+  hasPassword?: boolean
 }
 
 /** Flatten the folder tree into "Root/Sub/Leaf" display paths. */
-export function buildFolderPaths(folders: DmsFolder[]): { id: string; path: string }[] {
+export function buildFolderPaths(folders: DmsFolder[]): { id: string; path: string; locked: boolean }[] {
   const byId = new Map(folders.map(f => [f.id, f]))
   const cache = new Map<string, string>()
 
@@ -56,7 +57,7 @@ export function buildFolderPaths(folders: DmsFolder[]): { id: string; path: stri
   }
 
   return folders
-    .map(f => ({ id: f.id, path: pathOf(f.id) }))
+    .map(f => ({ id: f.id, path: pathOf(f.id), locked: Boolean(f.hasPassword) }))
     .filter(f => f.path !== '')
     .sort((a, b) => a.path.localeCompare(b.path))
 }
