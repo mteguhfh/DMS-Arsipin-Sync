@@ -16,7 +16,12 @@ pub struct QueuedFile {
     pub mime_type: String,
     pub file_hash: String,
     pub watched_root: String,
+    pub attempts: u32,
 }
+
+/// How many times one file may be retried before it is logged as failed for good.
+const MAX_UPLOAD_ATTEMPTS: u32 = 3;
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SyncStatus {
@@ -35,6 +40,33 @@ pub struct SyncEngine {
     pub api: Arc<Mutex<Option<DmsApi>>>,
     pub watched_roots: Arc<Mutex<Vec<String>>>,
     pub watcher_events: Arc<Mutex<Vec<String>>>,
+}
+
+/// Poll metadata until size and mtime stop changing for one interval.
+/// Gives up after ~5s so a constantly-written file is skipped, not uploaded broken.
+async fn wait_until_stable(path: &str) -> Result<(), String> {
+    const INTERVAL: std::time::Duration = std::time::Duration::from_millis(500);
+    const MAX_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+
+    fn stamp(p: &str) -> Option<(u64, Option<std::time::SystemTime>)> {
+        let m = std::fs::metadata(p).ok()?;
+        Some((m.len(), m.modified().ok()))
+    }
+
+    let start = std::time::Instant::now();
+    let mut last = stamp(path).ok_or_else(|| "cannot stat file".to_string())?;
+
+    loop {
+        tokio::time::sleep(INTERVAL).await;
+        let now = stamp(path).ok_or_else(|| "file disappeared".to_string())?;
+        if now == last {
+            return Ok(());
+        }
+        if start.elapsed() >= MAX_WAIT {
+            return Err("still changing after 5s".to_string());
+        }
+        last = now;
+    }
 }
 
 impl SyncEngine {
@@ -188,6 +220,16 @@ impl SyncEngine {
             }
         };
 
+        // Wait until the file stops changing before reading it. A copy from USB,
+        // a download, or a save from an editor would otherwise upload a truncated body.
+        if let Err(e) = wait_until_stable(&file_path).await {
+            let msg = format!("unstable, skipped: {} ({})", file_path, e);
+            log::warn!("{}", msg);
+            let mut ev = self.watcher_events.lock().await;
+            ev.push(msg);
+            return;
+        }
+
         let data = tokio::fs::read(&file_path).await;
         if let Err(e) = data {
             let msg = format!("read error {}: {}", file_path, e);
@@ -223,6 +265,7 @@ impl SyncEngine {
             mime_type: mime,
             file_hash: hash,
             watched_root: root,
+            attempts: 0,
         };
 
         {
@@ -336,7 +379,36 @@ impl SyncEngine {
                 Err(e) => {
                     {
                         let mut ev = self.watcher_events.lock().await;
-                        ev.push(format!("upload FAIL: {} -> {}", item.relative_path, e));
+                        ev.push(format!(
+                            "upload FAIL (attempt {}/{}): {} -> {}",
+                            item.attempts + 1,
+                            MAX_UPLOAD_ATTEMPTS,
+                            item.relative_path,
+                            e
+                        ));
+                    }
+
+                    let retryable = item.attempts + 1 < MAX_UPLOAD_ATTEMPTS;
+                    if retryable {
+                        // Back off so a dead server does not spin the queue, then retry.
+                        let delay = std::time::Duration::from_secs(2u64.pow(item.attempts + 1));
+                        let mut retry = item.clone();
+                        retry.attempts += 1;
+                        let next_attempt = retry.attempts + 1;
+                        {
+                            let mut queue = self.queue.lock().await;
+                            queue.push(retry);
+                        }
+                        log::warn!(
+                            "Retrying {} in {}s (attempt {}/{}): {}",
+                            item.relative_path,
+                            delay.as_secs(),
+                            next_attempt,
+                            MAX_UPLOAD_ATTEMPTS,
+                            e
+                        );
+                        tokio::time::sleep(delay).await;
+                        continue;
                     }
 
                     let log_entry = SyncLogEntry {

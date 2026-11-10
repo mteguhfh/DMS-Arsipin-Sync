@@ -202,6 +202,18 @@ async fn remove_watch_folder(state: tauri::State<'_, AppState>, path: String) ->
         roots.retain(|r| r != &path);
     }
 
+    // Drop queued files that belong to the removed root; they must not upload
+    // after the user stopped watching that folder.
+    {
+        let mut queue = state.engine.queue.lock().await;
+        let before = queue.len();
+        queue.retain(|q| q.watched_root != path);
+        let dropped = before - queue.len();
+        if dropped > 0 {
+            log::info!("Dropped {} queued file(s) from {}", dropped, path);
+        }
+    }
+
     // Remove from config
     {
         let mut config = state.config.lock().await;
