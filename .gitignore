@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 src-tauri/target/
 .codebase-memory/
+
+# Local-only agent context and decision records
+AGENTS.md
+docs/adr/
