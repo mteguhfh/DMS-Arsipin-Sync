@@ -1,22 +1,27 @@
 import { useState, useEffect } from 'react'
+import type { AppConfig } from '../types'
 
 interface Props {
   onLogout: () => void
 }
 
 export default function Settings({ onLogout }: Props) {
-  const [config, setConfig] = useState<any>(null)
+  const [config, setConfig] = useState<AppConfig | null>(null)
   const [saved, setSaved] = useState(false)
 
-  useEffect(() => { loadConfig() }, [])
-
-  async function loadConfig() {
-    try {
-      const { invoke } = await import('@tauri-apps/api/core')
-      const c = await invoke('get_config')
-      setConfig(c as any)
-    } catch { }
-  }
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        const c = await invoke<AppConfig>('get_config')
+        if (!cancelled) setConfig(c)
+      } catch {
+        if (!cancelled) setConfig(null)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   async function handleClearLog() {
     try {
@@ -24,23 +29,25 @@ export default function Settings({ onLogout }: Props) {
       await invoke('clear_sync_log')
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
-    } catch { }
+    } catch {
+      setSaved(false)
+    }
   }
 
   if (!config) return <div className="loading">Loading...</div>
 
-  const folders = config.watched_folders?.length > 0
-    ? config.watched_folders
-    : config.watched_folder
-      ? [config.watched_folder]
+  const folders = config.watchedFolders?.length > 0
+    ? config.watchedFolders
+    : config.watchedFolder
+      ? [config.watchedFolder]
       : []
 
   return (
     <div className="settings">
       <div className="setting-card">
         <h3>Akun</h3>
-        <p>Masuk sebagai: <strong>{config.last_email || 'Belum login'}</strong></p>
-        <p>Server: {config.server_url}</p>
+        <p>Masuk sebagai: <strong>{config.lastEmail || 'Belum login'}</strong></p>
+        <p>Server: {config.serverUrl}</p>
         <button className="btn-danger" onClick={onLogout}>Logout</button>
       </div>
 
@@ -48,7 +55,7 @@ export default function Settings({ onLogout }: Props) {
         <h3>Folder yang Dipantau</h3>
         {folders.length > 0 ? (
           <div className="folder-list">
-            {folders.map((f: string, i: number) => (
+            {folders.map((f, i) => (
               <div key={i} className="folder-item" style={{ border: 'none', padding: '4px 0', cursor: 'default' }}>
                 <span className="folder-icon">📁</span>
                 <span className="folder-name" style={{ fontSize: '12px' }}>{f}</span>

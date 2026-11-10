@@ -30,12 +30,26 @@ pub struct SyncLogEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TargetFolder {
+    /// Local watched root this target applies to.
+    pub local_path: String,
+    /// DMS folder id; empty means "derive from the local folder name".
+    pub dms_folder_id: String,
+    /// Human readable path in DMS, for display only.
+    pub dms_folder_path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppConfig {
     pub server_url: String,
     #[serde(default)]
     pub watched_folder: Option<String>,
     #[serde(default)]
     pub watched_folders: Vec<String>,
+    #[serde(default)]
+    pub folder_targets: Vec<TargetFolder>,
     pub auto_start: bool,
     pub folder_cache: Vec<FolderEntry>,
     pub sync_log: Vec<SyncLogEntry>,
@@ -49,6 +63,7 @@ impl Default for AppConfig {
             server_url: "https://dms.arsipin.id".to_string(),
             watched_folder: None,
             watched_folders: Vec::new(),
+            folder_targets: Vec::new(),
             auto_start: true,
             folder_cache: Vec::new(),
             sync_log: Vec::new(),

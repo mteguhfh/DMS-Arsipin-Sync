@@ -23,6 +23,7 @@ pub struct LoginResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FolderResponse {
     pub id: String,
     pub name: String,

@@ -105,6 +105,13 @@ async fn logout(state: tauri::State<'_, AppState>) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn list_dms_folders(state: tauri::State<'_, AppState>) -> Result<Vec<api::FolderResponse>, String> {
+    let api_lock = state.engine.api.lock().await;
+    let api = api_lock.as_ref().ok_or("Not logged in")?;
+    api.get_folders().await
+}
+
+#[tauri::command]
 async fn check_session(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
     let api_lock = state.engine.api.lock().await;
     if let Some(ref api) = *api_lock {
@@ -187,6 +194,40 @@ async fn add_watch_folder(state: tauri::State<'_, AppState>, path: String) -> Re
 }
 
 #[tauri::command]
+async fn set_folder_target(
+    state: tauri::State<'_, AppState>,
+    path: String,
+    dms_folder_id: String,
+    dms_folder_path: String,
+) -> Result<String, String> {
+    let path = path.trim_end_matches(&['/', '\\', ' '][..]).to_string();
+
+    {
+        let mut targets = state.engine.targets.lock().await;
+        if dms_folder_path.is_empty() {
+            targets.remove(&path);
+        } else {
+            targets.insert(path.clone(), dms_folder_path.clone());
+        }
+    }
+
+    {
+        let mut config = state.config.lock().await;
+        config.folder_targets.retain(|t| t.local_path != path);
+        if !dms_folder_path.is_empty() {
+            config.folder_targets.push(config::TargetFolder {
+                local_path: path.clone(),
+                dms_folder_id,
+                dms_folder_path: dms_folder_path.clone(),
+            });
+        }
+        config.save()?;
+    }
+
+    Ok(format!("Target for {} set to {}", path, dms_folder_path))
+}
+
+#[tauri::command]
 async fn remove_watch_folder(state: tauri::State<'_, AppState>, path: String) -> Result<String, String> {
     let path = path.trim_end_matches(&['/', '\\', ' '][..]).to_string();
 
@@ -218,7 +259,13 @@ async fn remove_watch_folder(state: tauri::State<'_, AppState>, path: String) ->
     {
         let mut config = state.config.lock().await;
         config.watched_folders.retain(|f| f != &path);
+        config.folder_targets.retain(|t| t.local_path != path);
         config.save()?;
+    }
+
+    {
+        let mut targets = state.engine.targets.lock().await;
+        targets.remove(&path);
     }
 
     Ok(format!("Stopped watching: {}", path))
@@ -272,6 +319,14 @@ pub fn run() {
         let mut roots = engine.watched_roots.blocking_lock();
         *roots = config.watched_folders();
     }
+    {
+        let mut targets = engine.targets.blocking_lock();
+        for t in &config.folder_targets {
+            if !t.dms_folder_path.is_empty() {
+                targets.insert(t.local_path.clone(), t.dms_folder_path.clone());
+            }
+        }
+    }
 
     let app_state = AppState {
         engine: engine.clone(),
@@ -294,6 +349,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             login,
             logout,
+            list_dms_folders,
+            set_folder_target,
             check_session,
             test_sync,
             get_status,

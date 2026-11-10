@@ -17,6 +17,8 @@ pub struct QueuedFile {
     pub file_hash: String,
     pub watched_root: String,
     pub attempts: u32,
+    /// DMS folder path chosen by the user for this watched root, if any.
+    pub dms_target: Option<String>,
 }
 
 /// How many times one file may be retried before it is logged as failed for good.
@@ -39,6 +41,8 @@ pub struct SyncEngine {
     pub folder_cache: Arc<Mutex<FolderCache>>,
     pub api: Arc<Mutex<Option<DmsApi>>>,
     pub watched_roots: Arc<Mutex<Vec<String>>>,
+    /// Maps a local watched root to the DMS folder path chosen in the UI.
+    pub targets: Arc<Mutex<HashMap<String, String>>>,
     pub watcher_events: Arc<Mutex<Vec<String>>>,
 }
 
@@ -79,6 +83,7 @@ impl SyncEngine {
             folder_cache: Arc::new(Mutex::new(FolderCache::new())),
             api: Arc::new(Mutex::new(None)),
             watched_roots: Arc::new(Mutex::new(Vec::new())),
+            targets: Arc::new(Mutex::new(HashMap::new())),
             watcher_events: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -258,6 +263,11 @@ impl SyncEngine {
         };
         let mime = Self::mime_from_ext(&file_path);
 
+        let dms_target = {
+            let targets = self.targets.lock().await;
+            targets.get(&root).cloned()
+        };
+
         let qf = QueuedFile {
             file_path: file_path.clone(),
             relative_path: rel.clone(),
@@ -266,6 +276,7 @@ impl SyncEngine {
             file_hash: hash,
             watched_root: root,
             attempts: 0,
+            dms_target,
         };
 
         {
@@ -308,9 +319,19 @@ impl SyncEngine {
                 .map(|n| n.to_string_lossy().replace('\\', "/"))
                 .unwrap_or_default();
 
-            let folder_path = Self::folder_path_from_relative(&item.relative_path)
-                .map(|sub| format!("{}/{}", watched_root_name, sub))
-                .or(Some(watched_root_name));
+            let folder_path = match &item.dms_target {
+                Some(target) => {
+                    // User picked an existing DMS folder: mirror subfolders under it.
+                    let sub = Self::folder_path_from_relative(&item.relative_path);
+                    Some(match sub {
+                        Some(sub) => format!("{}/{}", target, sub),
+                        None => target.clone(),
+                    })
+                }
+                None => Self::folder_path_from_relative(&item.relative_path)
+                    .map(|sub| format!("{}/{}", watched_root_name, sub))
+                    .or(Some(watched_root_name)),
+            };
 
             let fp_for_log = folder_path.clone();
 

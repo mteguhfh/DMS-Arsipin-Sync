@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import LoginPage from './components/LoginPage'
 import Dashboard from './components/Dashboard'
 import Settings from './components/Settings'
+import BrandLogo from './components/BrandLogo'
+import type { StatusData } from './types'
 import './App.css'
 
 type Page = 'login' | 'dashboard' | 'settings'
@@ -9,7 +11,7 @@ type Theme = 'light' | 'dark'
 
 function App() {
   const [page, setPage] = useState<Page>('login')
-  const [status, setStatus] = useState<any>(null)
+  const [status, setStatus] = useState<StatusData | null>(null)
   const [theme, setTheme] = useState<Theme>(() => {
     return (localStorage.getItem('dms-sync-theme') as Theme) || 'light'
   })
@@ -29,8 +31,8 @@ function App() {
   async function checkLogin() {
     try {
       const { invoke } = await import('@tauri-apps/api/core')
-      const s = await invoke('get_status')
-      setStatus(s as any)
+      const s = await invoke<StatusData>('get_status')
+      setStatus(s)
       if (s) {
         setPage('dashboard')
       }
@@ -72,10 +74,10 @@ function App() {
       </div>
       <div className="app-layout">
         <aside className="sidebar">
-          <div className="sidebar-header">
-            <h3>DMS Sync</h3>
-            <p>v1.1.0 · {status?.last_email ? 'Terhubung' : 'Offline'}</p>
-          </div>
+            <div className="sidebar-header">
+              <BrandLogo size={34} />
+              <p>{status?.last_email ? 'Terhubung' : 'Offline'}</p>
+            </div>
           <nav className="sidebar-nav">
             <button
               className={`nav-item ${page === 'dashboard' ? 'active' : ''}`}

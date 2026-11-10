@@ -1,17 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-
-interface StatusData {
-  status?: string
-  queue_length?: number
-  watched_folders?: string[]
-  server_url?: string
-  last_email?: string
-  api_available?: boolean
-  event_count?: number
-}
+import type { StatusData, SyncLog, DmsFolder } from '../types'
+import { errorMessage, buildFolderPaths } from '../types'
 
 interface Props {
-  status: StatusData
+  status: StatusData | null
 }
 
 const fileIcons: Record<string, string> = {
@@ -42,9 +34,9 @@ function timeAgo(ts: string): string {
 }
 
 export default function Dashboard({ status }: Props) {
-  const [logs, setLogs] = useState<any[]>([])
+  const [logs, setLogs] = useState<SyncLog[]>([])
   const [currentStatus, setCurrentStatus] = useState(status)
-  const [folders, setFolders] = useState<string[]>(status.watched_folders || [])
+  const [folders, setFolders] = useState<string[]>(status?.watched_folders || [])
   const [folderInput, setFolderInput] = useState('')
   const [error, setError] = useState('')
   const [sessionOk, setSessionOk] = useState<boolean | null>(null)
@@ -54,60 +46,67 @@ export default function Dashboard({ status }: Props) {
   const [watcherEvents, setWatcherEvents] = useState<string[]>([])
   const [showDebug, setShowDebug] = useState(false)
   const [removing, setRemoving] = useState<string | null>(null)
+  const [dmsFolders, setDmsFolders] = useState<{ id: string; path: string }[]>([])
+  const [targets, setTargets] = useState<Record<string, string>>({})
+  const [folderError, setFolderError] = useState('')
 
   const refresh = useCallback(async (debug?: boolean) => {
     try {
       const { invoke } = await import('@tauri-apps/api/core')
-      const s = await invoke('get_status')
-      setCurrentStatus(s as any)
-      setFolders((s as any).watched_folders || [])
-      const l = await invoke('get_sync_log')
-      setLogs(l as any[])
+      const s = await invoke<StatusData>('get_status')
+      setCurrentStatus(s)
+      setFolders(s.watched_folders || [])
+      const l = await invoke<SyncLog[]>('get_sync_log')
+      setLogs(l)
       if (debug || showDebug) {
-        const ev = await invoke('get_watcher_events')
-        setWatcherEvents(ev as string[])
+        const ev = await invoke<string[]>('get_watcher_events')
+        setWatcherEvents(ev)
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('refresh error:', err)
     }
   }, [showDebug])
 
   useEffect(() => {
-    refresh()
-    const interval = setInterval(refresh, 5000)
-    return () => clearInterval(interval)
+    // Poll the backend; the first run is deferred so it is not a synchronous
+    // setState during the effect body.
+    const interval = setInterval(() => { void refresh() }, 5000)
+    const first = setTimeout(() => { void refresh() }, 0)
+    return () => {
+      clearTimeout(first)
+      clearInterval(interval)
+    }
   }, [refresh])
 
-  // Auto-start watcher for saved folders on mount (backend loads roots, commands have tokio runtime)
+  // Resume watchers for folders restored from config. The backend re-adds each
+  // root, and duplicate registration is rejected, so a failure here is expected
+  // when the folder is already watched and must not surface to the user.
   useEffect(() => {
-    const saved = folders
-    if (saved.length > 0) {
-      ;(async () => {
+    const saved = status?.watched_folders || []
+    if (saved.length === 0) return
+    void (async () => {
+      const { invoke } = await import('@tauri-apps/api/core')
+      for (const folder of saved) {
         try {
-          const { invoke } = await import('@tauri-apps/api/core')
-          for (const folder of saved) {
-            // Silently ignore if already watching (duplicate handled by backend)
-            try { await invoke('add_watch_folder', { path: folder }) } catch {}
-          }
-          refresh()
-        } catch { /* watcher may already be started */ }
-      })()
-    }
-  }, [])
-
-  // Refresh on mount
-  useEffect(() => { refresh() }, [])
+          await invoke('add_watch_folder', { path: folder })
+        } catch {
+          // already watching
+        }
+      }
+      await refresh()
+    })()
+  }, [status?.watched_folders, refresh])
 
   async function testSyncUpload() {
     setTestingSync(true)
     setTestResult(null)
     try {
       const { invoke } = await import('@tauri-apps/api/core')
-      const result = await invoke('test_sync')
-      setTestResult(result as string)
-      refresh()
-    } catch (err: any) {
-      setTestResult('ERROR: ' + (typeof err === 'string' ? err : err.message || 'Unknown'))
+      const result = await invoke<string>('test_sync')
+      setTestResult(result)
+      await refresh()
+    } catch (err) {
+      setTestResult('ERROR: ' + errorMessage(err))
     } finally {
       setTestingSync(false)
     }
@@ -118,8 +117,8 @@ export default function Dashboard({ status }: Props) {
       const { open } = await import('@tauri-apps/plugin-dialog')
       const selected = await open({ directory: true, multiple: false, title: 'Pilih Folder untuk Sync' })
       if (selected) setFolderInput(selected)
-    } catch (err: any) {
-      setError(err.message || 'Failed to open folder picker')
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to open folder picker')
     }
   }
 
@@ -130,9 +129,9 @@ export default function Dashboard({ status }: Props) {
       await invoke('add_watch_folder', { path: folderInput.trim() })
       setFolderInput('')
       setError('')
-      refresh()
-    } catch (err: any) {
-      setError(err.message || 'Failed to add folder')
+      await refresh()
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to add folder')
     }
   }
 
@@ -142,11 +141,57 @@ export default function Dashboard({ status }: Props) {
       const { invoke } = await import('@tauri-apps/api/core')
       await invoke('remove_watch_folder', { path })
       setError('')
-      refresh()
-    } catch (err: any) {
-      setError(err.message || 'Failed to remove folder')
+      await refresh()
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to remove folder')
     } finally {
       setRemoving(null)
+    }
+  }
+
+  // Load the DMS folder tree and the saved per-folder targets once.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        const list = await invoke<DmsFolder[]>('list_dms_folders')
+        if (!cancelled) setDmsFolders(buildFolderPaths(list))
+      } catch (err) {
+        if (!cancelled) setFolderError('Gagal memuat folder DMS: ' + errorMessage(err))
+      }
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        const c = await invoke<{ folderTargets: { localPath: string; dmsFolderPath: string }[] }>('get_config')
+        if (cancelled) return
+        const map: Record<string, string> = {}
+        for (const t of c.folderTargets || []) map[t.localPath] = t.dmsFolderPath
+        setTargets(map)
+      } catch {
+        // targets stay empty; default naming applies
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  async function handleSetTarget(localPath: string, dmsPath: string) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const id = dmsFolders.find(f => f.path === dmsPath)?.id || ''
+      await invoke('set_folder_target', {
+        path: localPath,
+        dmsFolderId: id,
+        dmsFolderPath: dmsPath,
+      })
+      setTargets(prev => {
+        const next = { ...prev }
+        if (dmsPath) next[localPath] = dmsPath
+        else delete next[localPath]
+        return next
+      })
+      setFolderError('')
+    } catch (err) {
+      setFolderError(errorMessage(err))
     }
   }
 
@@ -157,9 +202,9 @@ export default function Dashboard({ status }: Props) {
       await invoke('check_session')
       setSessionOk(true)
       setError('')
-    } catch (err: any) {
+    } catch (err) {
       setSessionOk(false)
-      setError('Session error: ' + (typeof err === 'string' ? err : err.message || 'Unknown'))
+      setError('Session error: ' + errorMessage(err))
     } finally {
       setTestingSession(false)
     }
@@ -216,30 +261,50 @@ export default function Dashboard({ status }: Props) {
         {folders.length > 0 ? (
           <div className="folder-list">
             {folders.map((f, i) => (
-              <div key={i} className="folder-item">
-                <span className="folder-icon">📁</span>
-                <span className="folder-name">{f}</span>
-                <button
-                  className="remove-btn"
-                  onClick={() => handleRemoveFolder(f)}
-                  disabled={removing === f}
-                >
-                  {removing === f ? '...' : '✕'}
-                </button>
+              <div key={i} className="folder-item folder-item-target">
+                <div className="folder-row">
+                  <span className="folder-icon">📁</span>
+                  <span className="folder-name">{f}</span>
+                  <button
+                    className="remove-btn"
+                    onClick={() => handleRemoveFolder(f)}
+                    disabled={removing === f}
+                  >
+                    {removing === f ? '...' : '✕'}
+                  </button>
+                </div>
+                <label className="target-row">
+                  <span>Tujuan DMS</span>
+                  <select
+                    value={targets[f] || ''}
+                    onChange={(e) => handleSetTarget(f, e.target.value)}
+                    className="target-select"
+                  >
+                    <option value="">
+                      Otomatis (pakai nama folder: {f.split(/[/\\]/).filter(Boolean).pop()})
+                    </option>
+                    {dmsFolders.map(d => (
+                      <option key={d.id} value={d.path}>{d.path}</option>
+                    ))}
+                  </select>
+                </label>
               </div>
             ))}
           </div>
         ) : (
           <p className="empty">Belum ada folder yang ditambahkan</p>
         )}
+        {folderError && <p className="err-msg">{folderError}</p>}
         <div className="folder-form">
           <input
             type="text"
             value={folderInput}
             onChange={(e) => setFolderInput(e.target.value)}
-            placeholder={navigator.platform?.includes('Win')
-              ? 'C:\\Users\\...\\MySyncFolder'
-              : '/Users/.../MySyncFolder'}
+            placeholder={
+              navigator.userAgent.includes('Windows')
+                ? 'C:\\Users\\...\\MySyncFolder'
+                : '/home/.../MySyncFolder'
+            }
             className="folder-input"
           />
           <button onClick={handleBrowse} className="btn-secondary">Browse</button>
