@@ -204,9 +204,9 @@ impl DmsApi {
         if status.is_success() {
             Ok(format!("OK ({}): {}", status, body))
         } else {
-            let cookies = self.get_cookie_string();
-            log::error!("Sync test failed ({}): {} | cookies: {}", status, body, cookies);
-            Err(format!("FAIL ({}): {} | cookies: {}", status, body, cookies))
+            let has_cookie = !self.get_cookie_string().is_empty();
+            log::error!("Sync test failed ({}): {} | session cookie present: {}", status, body, has_cookie);
+            Err(format!("FAIL ({}): {}", status, body))
         }
     }
 
@@ -222,9 +222,9 @@ impl DmsApi {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            // Log the cookie we're sending for debugging
-            let cookies = self.get_cookie_string();
-            log::warn!("Session check failed ({}): {} | cookies: {}", status, text, cookies);
+            // Log only whether a cookie was sent, never its value
+            let has_cookie = !self.get_cookie_string().is_empty();
+            log::warn!("Session check failed ({}): {} | session cookie present: {}", status, text, has_cookie);
             return Err(format!("Session invalid ({}): {}", status, text));
         }
 

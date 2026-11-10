@@ -40,6 +40,12 @@ function App() {
   }
 
   async function handleLogout() {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      await invoke('logout')
+    } catch {
+      // Still return to the login screen even if the backend call fails
+    }
     setPage('login')
     setStatus(null)
   }

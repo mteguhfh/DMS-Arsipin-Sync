@@ -96,18 +96,31 @@ impl AppConfig {
         config
     }
 
-    pub fn save(&self) {
+    pub fn save(&self) -> Result<(), String> {
         // For save, always clear old watched_folder, use watched_folders only
         let mut data = self.clone();
         data.watched_folder = None;
-        if let Ok(json) = serde_json::to_string_pretty(&data) {
-            let p = Self::path();
-            if let Some(dir) = p.parent() {
-                let _ = fs::create_dir_all(dir);
-            }
-            let _ = fs::write(&p, &json);
+        let json = serde_json::to_string_pretty(&data)
+            .map_err(|e| format!("Failed to serialize config: {}", e))?;
+        let p = Self::path();
+        if let Some(dir) = p.parent() {
+            fs::create_dir_all(dir)
+                .map_err(|e| format!("Failed to create config dir: {}", e))?;
         }
+        fs::write(&p, &json).map_err(|e| format!("Failed to write config: {}", e))?;
+        restrict_permissions(&p);
+        Ok(())
     }
 }
+
+/// The config file holds a live session cookie, so keep it owner-only.
+#[cfg(unix)]
+fn restrict_permissions(path: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
+}
+
+#[cfg(not(unix))]
+fn restrict_permissions(_path: &std::path::Path) {}
 
 

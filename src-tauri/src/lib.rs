@@ -40,7 +40,7 @@ async fn login(
         config.server_url = server_url.clone();
         config.last_email = Some(email.clone());
         config.session_cookie = Some(cookie_str);
-        config.save();
+        config.save()?;
     }
 
     {
@@ -64,6 +64,44 @@ async fn login(
     }
 
     Ok("Login successful".to_string())
+}
+
+#[tauri::command]
+async fn logout(state: tauri::State<'_, AppState>) -> Result<String, String> {
+    // Stop all watchers before dropping the session so nothing uploads afterwards.
+    {
+        let mut watcher_lock = state.watcher.lock().await;
+        watcher_lock.stop_all();
+    }
+
+    // Drop queued work; it belongs to the session being closed.
+    {
+        let mut queue = state.engine.queue.lock().await;
+        queue.clear();
+    }
+    {
+        let mut processed = state.engine.processed.lock().await;
+        processed.clear();
+    }
+    {
+        let mut status = state.engine.status.lock().await;
+        *status = sync::SyncStatus::Idle;
+    }
+
+    // Forget the API client so uploads fail fast until the next login.
+    {
+        let mut api_lock = state.engine.api.lock().await;
+        *api_lock = None;
+    }
+
+    {
+        let mut config = state.config.lock().await;
+        config.session_cookie = None;
+        config.last_email = None;
+        config.save()?;
+    }
+
+    Ok("Logged out".to_string())
 }
 
 #[tauri::command]
@@ -141,7 +179,7 @@ async fn add_watch_folder(state: tauri::State<'_, AppState>, path: String) -> Re
         let mut config = state.config.lock().await;
         if !config.watched_folders.contains(&path) {
             config.watched_folders.push(path.clone());
-            config.save();
+            config.save()?;
         }
     }
 
@@ -168,7 +206,7 @@ async fn remove_watch_folder(state: tauri::State<'_, AppState>, path: String) ->
     {
         let mut config = state.config.lock().await;
         config.watched_folders.retain(|f| f != &path);
-        config.save();
+        config.save()?;
     }
 
     Ok(format!("Stopped watching: {}", path))
@@ -243,6 +281,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             login,
+            logout,
             check_session,
             test_sync,
             get_status,
