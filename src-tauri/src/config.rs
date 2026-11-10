@@ -40,20 +40,32 @@ pub struct TargetFolder {
     pub dms_folder_path: String,
 }
 
+/// Stored on disk as snake_case and sent to the frontend as camelCase.
+///
+/// The disk format must stay snake_case: existing installs already have
+/// `server_url`/`session_cookie` written that way, and changing it silently
+/// drops the saved session. Deserialize accepts both spellings so installs
+/// that ran a camelCase build recover automatically.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
 pub struct AppConfig {
+    #[serde(alias = "serverUrl")]
     pub server_url: String,
-    #[serde(default)]
+    #[serde(default, alias = "watchedFolder")]
     pub watched_folder: Option<String>,
-    #[serde(default)]
+    #[serde(default, alias = "watchedFolders")]
     pub watched_folders: Vec<String>,
-    #[serde(default)]
+    #[serde(default, alias = "folderTargets")]
     pub folder_targets: Vec<TargetFolder>,
+    #[serde(alias = "autoStart")]
     pub auto_start: bool,
+    #[serde(default, alias = "folderCache")]
     pub folder_cache: Vec<FolderEntry>,
+    #[serde(default, alias = "syncLog")]
     pub sync_log: Vec<SyncLogEntry>,
+    #[serde(default, alias = "lastEmail")]
     pub last_email: Option<String>,
+    #[serde(default, alias = "sessionCookie")]
     pub session_cookie: Option<String>,
 }
 
@@ -139,3 +151,36 @@ fn restrict_permissions(path: &std::path::Path) {
 fn restrict_permissions(_path: &std::path::Path) {}
 
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_legacy_snake_case() {
+        let raw = r#"{"server_url":"https://a","auto_start":true,"folder_cache":[],
+            "sync_log":[],"last_email":"x@y","session_cookie":"tok"}"#;
+        let c: AppConfig = serde_json::from_str(raw).unwrap();
+        assert_eq!(c.server_url, "https://a");
+        assert_eq!(c.last_email.as_deref(), Some("x@y"));
+        assert_eq!(c.session_cookie.as_deref(), Some("tok"));
+    }
+
+    #[test]
+    fn reads_camel_case_written_by_earlier_build() {
+        let raw = r#"{"serverUrl":"https://a","autoStart":true,"folderCache":[],
+            "syncLog":[],"lastEmail":"x@y","sessionCookie":"tok","watchedFolders":["/tmp"]}"#;
+        let c: AppConfig = serde_json::from_str(raw).unwrap();
+        assert_eq!(c.server_url, "https://a");
+        assert_eq!(c.session_cookie.as_deref(), Some("tok"));
+        assert_eq!(c.watched_folders, vec!["/tmp".to_string()]);
+    }
+
+    #[test]
+    fn writes_snake_case() {
+        let json = serde_json::to_string(&AppConfig::default()).unwrap();
+        assert!(json.contains("\"server_url\""));
+        assert!(json.contains("\"session_cookie\""));
+        assert!(!json.contains("\"serverUrl\""));
+    }
+}

@@ -272,9 +272,32 @@ async fn remove_watch_folder(state: tauri::State<'_, AppState>, path: String) ->
 }
 
 #[tauri::command]
-async fn get_config(state: tauri::State<'_, AppState>) -> Result<AppConfig, String> {
+async fn get_config(state: tauri::State<'_, AppState>) -> Result<serde_json::Value, String> {
+    // Config is stored snake_case but the frontend expects camelCase.
+    const ALIASES: &[(&str, &str)] = &[
+        ("server_url", "serverUrl"),
+        ("watched_folder", "watchedFolder"),
+        ("watched_folders", "watchedFolders"),
+        ("folder_targets", "folderTargets"),
+        ("auto_start", "autoStart"),
+        ("folder_cache", "folderCache"),
+        ("sync_log", "syncLog"),
+        ("last_email", "lastEmail"),
+        ("session_cookie", "sessionCookie"),
+    ];
+
     let config = state.config.lock().await;
-    Ok(config.clone())
+    let value = serde_json::to_value(&*config)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+    let serde_json::Value::Object(mut map) = value else {
+        return Err("Config did not serialize to an object".to_string());
+    };
+    for (snake, camel) in ALIASES {
+        if let Some(v) = map.remove(*snake) {
+            map.insert((*camel).to_string(), v);
+        }
+    }
+    Ok(serde_json::Value::Object(map))
 }
 
 #[tauri::command]
