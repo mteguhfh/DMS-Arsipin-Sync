@@ -22,6 +22,7 @@ Format: [MADR](https://adr.github.io/madr/) ringkas. Status yang dipakai: `Propo
 | [0012](0012-login-2fa-via-totp.md) | Login 2FA lewat TOTP di klien | Accepted |
 | [0013](0013-folder-password-and-tree-payload.md) | Folder berpassword dan payload pohon folder | Accepted |
 | [0014](0014-auto-update-via-tauri-updater.md) | Pembaruan otomatis via Tauri updater | Accepted |
+| [0015](0015-rustls-for-http-client.md) | Rustls untuk HTTP client | Accepted |
 
 ## Menambah ADR
 
