@@ -191,8 +191,8 @@ jobs:
       - name: List artifacts
         run: find artifacts -type f | sort
 
-      - name: Merge updater manifests
-        run: node scripts/merge-updater-manifests.mjs artifacts
+      - name: Generate updater manifest
+        run: node scripts/generate-updater-manifest.mjs artifacts release-assets
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -230,17 +230,10 @@ jobs:
             ```
           files: |
             artifacts/**/*.dmg
-            artifacts/**/*.tar.gz
-            artifacts/**/*.tar.gz.sig
             artifacts/**/*.msi
-            artifacts/**/*.msi.sig
-            artifacts/**/*.exe
-            artifacts/**/*.exe.sig
             artifacts/**/*.deb
             artifacts/**/*.rpm
-            artifacts/**/*.AppImage
-            artifacts/**/*.AppImage.sig
-            artifacts/latest.json
+            release-assets/*
           fail_on_unmatched_files: true
           draft: false
           prerelease: false
