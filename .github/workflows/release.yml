@@ -102,7 +102,7 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npm run tauri build -- --target ${{ matrix.target }} --bundles dmg
+        run: npm run tauri build -- --target ${{ matrix.target }} --bundles dmg,app
 
       - name: Build Tauri app (Linux)
         if: runner.os == 'Linux'
@@ -117,6 +117,7 @@ jobs:
           name: updater-${{ matrix.name }}
           path: |
             src-tauri/target/**/release/bundle/**/*.sig
+            src-tauri/target/**/release/bundle/**/*.tar.gz
             src-tauri/target/**/release/bundle/**/latest.json
           compression-level: 0
           if-no-files-found: error
@@ -229,7 +230,8 @@ jobs:
             ```
           files: |
             artifacts/**/*.dmg
-            artifacts/**/*.dmg.sig
+            artifacts/**/*.tar.gz
+            artifacts/**/*.tar.gz.sig
             artifacts/**/*.msi
             artifacts/**/*.msi.sig
             artifacts/**/*.exe

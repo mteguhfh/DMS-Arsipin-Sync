@@ -15,7 +15,7 @@ Tauri v2 menyediakan plugin `updater` dan `process`. Plugin updater memverifikas
 - Plugin `tauri-plugin-updater` dan `tauri-plugin-process` didaftarkan di Rust dan diberi permission `updater:default` serta `process:default`.
 - `tauri.conf.json` mengaktifkan `bundle.createUpdaterArtifacts`, memasang public key, dan menunjuk endpoint `https://github.com/mteguhfh/DMS-Arsipin-Sync/releases/latest/download/latest.json`.
 - Kunci privat disimpan sebagai GitHub Actions secret `TAURI_SIGNING_PRIVATE_KEY`; kunci publik ditanam di aplikasi.
-- Workflow rilis menghasilkan artefak bertanda tangan untuk MSI, NSIS, DMG, dan AppImage. Linux tetap memakai DEB/RPM sebagai installer manual, sementara AppImage dipakai untuk update OTA.
+- Workflow rilis menghasilkan artefak bertanda tangan untuk MSI, NSIS, DMG, dan AppImage. macOS juga membangun target `app` agar Tauri menghasilkan `.tar.gz` dan `.sig`. Linux tetap memakai DEB/RPM sebagai installer manual, sementara AppImage dipakai untuk update OTA.
 - Workflow menggabungkan `latest.json` per target menjadi satu manifest multi-platform sebelum publikasi.
 - UI menampilkan banner "Versi X tersedia" sekali per sesi. Tombol "Perbarui" mengunduh, memasang, lalu menjalankan ulang aplikasi.
 
