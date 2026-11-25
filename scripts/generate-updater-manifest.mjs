@@ -30,26 +30,26 @@ const targets = [
   {
     platform: 'linux-x86_64',
     target: 'x86_64-unknown-linux-gnu',
-    asset: `DMS Sync_${version}_amd64.AppImage`,
+    asset: `DMS.Sync_${version}_amd64.AppImage`,
     match: file => file.includes('x86_64-unknown-linux-gnu') && file.endsWith('.AppImage'),
   },
   {
     platform: 'windows-x86_64',
     target: 'x86_64-pc-windows-msvc',
-    asset: `DMS Sync_${version}_x64-setup.exe`,
+    asset: `DMS.Sync_${version}_x64-setup.exe`,
     match: file =>
       file.includes('x86_64-pc-windows-msvc') && file.includes('/nsis/') && file.endsWith('-setup.exe'),
   },
   {
     platform: 'darwin-x86_64',
     target: 'x86_64-apple-darwin',
-    asset: `DMS Sync_${version}_x64.app.tar.gz`,
+    asset: `DMS.Sync_${version}_x64.app.tar.gz`,
     match: file => file.includes('x86_64-apple-darwin') && file.endsWith('.app.tar.gz'),
   },
   {
     platform: 'darwin-aarch64',
     target: 'aarch64-apple-darwin',
-    asset: `DMS Sync_${version}_aarch64.app.tar.gz`,
+    asset: `DMS.Sync_${version}_aarch64.app.tar.gz`,
     match: file => file.includes('aarch64-apple-darwin') && file.endsWith('.app.tar.gz'),
   },
 ]
