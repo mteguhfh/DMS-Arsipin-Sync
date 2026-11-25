@@ -216,7 +216,8 @@ impl DmsApi {
     }
 
     pub async fn get_folders(&self) -> Result<Vec<FolderResponse>, String> {
-        let url = format!("{}/api/folders", self.base_url);
+        // `tree=1` memangkas payload besar; backend menyertakan `hasPassword`.
+        let url = format!("{}/api/folders?tree=1", self.base_url);
         let resp = self
             .client
             .get(&url)
