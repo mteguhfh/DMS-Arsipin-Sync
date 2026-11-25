@@ -1,4 +1,4 @@
-use crate::api::DmsApi;
+use crate::api::{DmsApi, UploadError};
 use crate::config::SyncLogEntry;
 use crate::folder_cache::FolderCache;
 use chrono::Utc;
@@ -334,10 +334,17 @@ impl SyncEngine {
             };
 
             let fp_for_log = folder_path.clone();
+            // DMS menyimpan nama dokumen, bukan path relatif. Subfolder sudah
+            // tercermin di folderPath, jadi kirim basename saja.
+            let file_name = Path::new(&item.relative_path)
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_else(|| item.relative_path.clone());
 
             {
                 let mut ev = self.watcher_events.lock().await;
                 ev.push(format!("processing: {} folderPath={:?}", item.relative_path, fp_for_log));
+                ev.push(format!("upload name: {}", file_name));
             }
 
             let result = {
@@ -351,14 +358,17 @@ impl SyncEngine {
                         &item.file_path,
                         item.file_data.clone(),
                         &item.mime_type,
-                        &item.relative_path,
+                        &file_name,
                         folder_path.as_deref(),
                     )
                     .await
                 } else {
                     let mut ev = self.watcher_events.lock().await;
                     ev.push("ERROR: api not available (not logged in)".to_string());
-                    Err("Not logged in".to_string())
+                    Err(UploadError {
+                        status: Some(401),
+                        message: "Not logged in".to_string(),
+                    })
                 }
             };
 
@@ -409,7 +419,7 @@ impl SyncEngine {
                         ));
                     }
 
-                    let retryable = item.attempts + 1 < MAX_UPLOAD_ATTEMPTS;
+                    let retryable = item.attempts + 1 < MAX_UPLOAD_ATTEMPTS && e.is_retryable();
                     if retryable {
                         // Back off so a dead server does not spin the queue, then retry.
                         let delay = std::time::Duration::from_secs(2u64.pow(item.attempts + 1));
@@ -438,7 +448,7 @@ impl SyncEngine {
                         status: "error".to_string(),
                         timestamp: Utc::now().to_rfc3339(),
                         folder_path: folder_path.clone(),
-                        error: Some(e.clone()),
+                        error: Some(e.to_string()),
                     };
 
                     {

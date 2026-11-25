@@ -2,6 +2,7 @@ use reqwest::cookie::CookieStore;
 use reqwest::cookie::Jar;
 use reqwest::multipart;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -20,6 +21,37 @@ pub struct SyncUploadResponse {
 pub struct LoginResponse {
     pub user: Option<serde_json::Value>,
     pub session: Option<serde_json::Value>,
+    /// Better Auth two-factor plugin sends this instead of a session.
+    #[serde(default, rename = "twoFactorRedirect")]
+    pub two_factor_redirect: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct UploadError {
+    pub status: Option<u16>,
+    pub message: String,
+}
+
+impl UploadError {
+    pub fn is_retryable(&self) -> bool {
+        match self.status {
+            None => true,
+            Some(429) | Some(500..=506) | Some(508..=599) => true,
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for UploadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+/// `GET /api/auth/get-session` mengembalikan `null` dengan status 200 bila
+/// tidak ada sesi. Status saja tidak cukup untuk menyatakan login berhasil.
+pub fn session_is_valid(data: &serde_json::Value) -> bool {
+    data.is_object() && (data.get("session").is_some() || data.get("user").is_some())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,6 +67,7 @@ pub struct FolderResponse {
     pub has_password: bool,
 }
 
+#[derive(Clone)]
 pub struct DmsApi {
     client: reqwest::Client,
     base_url: String,
@@ -103,6 +136,30 @@ impl DmsApi {
         Ok(data)
     }
 
+    pub async fn verify_totp(&self, code: &str) -> Result<(), String> {
+        let url = format!("{}/api/auth/two-factor/verify-totp", self.base_url);
+        let body = serde_json::json!({ "code": code });
+
+        let resp = self
+            .client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Network error: {}", e))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("Kode 2FA ditolak ({}): {}", status, text));
+        }
+
+        // Better Auth mengembalikan JSON `{ status: true }`; cookie sesi sudah
+        // masuk jar lewat response ini, jadi body tidak perlu diparse.
+        let _ = resp.text().await;
+        Ok(())
+    }
+
     pub async fn sync_upload(
         &self,
         file_path: &str,
@@ -110,13 +167,16 @@ impl DmsApi {
         mime_type: &str,
         file_name: &str,
         folder_path: Option<&str>,
-    ) -> Result<SyncUploadResponse, String> {
+    ) -> Result<SyncUploadResponse, UploadError> {
         let url = format!("{}/api/sync/upload", self.base_url);
 
         let file_part = multipart::Part::bytes(file_data)
             .file_name(file_name.to_string())
             .mime_str(mime_type)
-            .map_err(|e| format!("MIME error: {}", e))?;
+            .map_err(|e| UploadError {
+                status: Some(400),
+                message: format!("MIME error: {}", e),
+            })?;
 
         let mut form = multipart::Form::new().part("file", file_part);
 
@@ -133,18 +193,24 @@ impl DmsApi {
             .multipart(form)
             .send()
             .await
-            .map_err(|e| format!("Upload error: {}", e))?;
+            .map_err(|e| UploadError {
+                status: None,
+                message: format!("Upload error: {}", e),
+            })?;
 
         if !resp.status().is_success() {
-            let status = resp.status();
+            let status = resp.status().as_u16();
             let text = resp.text().await.unwrap_or_default();
-            return Err(format!("Sync upload failed ({}): {}", status, text));
+            return Err(UploadError {
+                status: Some(status),
+                message: format!("Sync upload failed ({}): {}", status, text),
+            });
         }
 
-        let data: SyncUploadResponse = resp
-            .json()
-            .await
-            .map_err(|e| format!("Parse error: {}", e))?;
+        let data: SyncUploadResponse = resp.json().await.map_err(|e| UploadError {
+            status: Some(200),
+            message: format!("Parse error: {}", e),
+        })?;
 
         Ok(data)
     }
@@ -237,6 +303,41 @@ impl DmsApi {
         let data: serde_json::Value = resp.json().await
             .map_err(|e| format!("Parse error: {}", e))?;
 
+        if !session_is_valid(&data) {
+            return Err("Session invalid: no active session".to_string());
+        }
+
         Ok(data)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn err(status: Option<u16>) -> UploadError {
+        UploadError {
+            status,
+            message: "test".to_string(),
+        }
+    }
+
+    #[test]
+    fn retry_only_transient_upload_errors() {
+        assert!(err(None).is_retryable());
+        assert!(err(Some(429)).is_retryable());
+        assert!(err(Some(500)).is_retryable());
+        assert!(err(Some(503)).is_retryable());
+        assert!(!err(Some(400)).is_retryable());
+        assert!(!err(Some(401)).is_retryable());
+        assert!(!err(Some(403)).is_retryable());
+        assert!(!err(Some(507)).is_retryable());
+    }
+
+    #[test]
+    fn session_requires_object_with_user_or_session() {
+        assert!(!session_is_valid(&serde_json::json!(null)));
+        assert!(!session_is_valid(&serde_json::json!({})));
+        assert!(session_is_valid(&serde_json::json!({ "user": {}, "session": {} })));
     }
 }

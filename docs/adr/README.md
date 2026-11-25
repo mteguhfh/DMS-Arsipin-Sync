@@ -19,6 +19,7 @@ Format: [MADR](https://adr.github.io/madr/) ringkas. Status yang dipakai: `Propo
 | [0009](0009-dms-folder-target-per-root.md) | Pilih folder tujuan DMS per root lokal | Accepted |
 | [0010](0010-upload-stability-and-retry.md) | Tunggu file stabil dan retry upload gagal | Accepted |
 | [0011](0011-config-compatibility-and-session-hardening.md) | Format config snake_case, izin `0600`, dan logout | Accepted |
+| [0012](0012-login-2fa-via-totp.md) | Login 2FA lewat TOTP di klien | Accepted |
 
 ## Menambah ADR
 

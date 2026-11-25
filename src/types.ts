@@ -1,3 +1,7 @@
+export interface LoginResult {
+  two_factor_required: boolean
+}
+
 export interface StatusData {
   status?: string
   queue_length?: number

@@ -15,30 +15,38 @@ pub struct AppState {
     pub engine: Arc<SyncEngine>,
     pub config: Arc<Mutex<AppConfig>>,
     pub watcher: Arc<Mutex<watcher::FileWatcher>>,
+    pub pending_login: Arc<Mutex<Option<PendingLogin>>>,
 }
 
-#[tauri::command]
-async fn login(
-    state: tauri::State<'_, AppState>,
-    email: String,
-    password: String,
-    server_url: String,
-) -> Result<String, String> {
-    let api = DmsApi::new(&server_url);
-    let _result = api.login(&email, &password).await?;
+pub struct PendingLogin {
+    pub api: DmsApi,
+    pub server_url: String,
+    pub email: String,
+}
 
-    // Verify session immediately
-    match api.check_session().await {
-        Ok(session) => log::info!("Session verified: {:?}", session),
-        Err(e) => log::warn!("Session check after login: {}", e),
-    }
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct LoginResult {
+    pub two_factor_required: bool,
+}
+
+async fn finish_login(
+    state: &AppState,
+    api: DmsApi,
+    server_url: String,
+    email: String,
+) -> Result<(), String> {
+    let session = api.check_session().await?;
+    log::info!("Session verified: {:?}", session);
 
     let cookie_str = api.get_cookie_string();
+    if cookie_str.is_empty() {
+        return Err("Session cookie kosong setelah login".to_string());
+    }
 
     {
         let mut config = state.config.lock().await;
-        config.server_url = server_url.clone();
-        config.last_email = Some(email.clone());
+        config.server_url = server_url;
+        config.last_email = Some(email);
         config.session_cookie = Some(cookie_str);
         config.save()?;
     }
@@ -63,7 +71,80 @@ async fn login(
         }
     }
 
-    Ok("Login successful".to_string())
+    Ok(())
+}
+
+#[tauri::command]
+async fn login(
+    state: tauri::State<'_, AppState>,
+    email: String,
+    password: String,
+    server_url: String,
+) -> Result<LoginResult, String> {
+    let api = DmsApi::new(&server_url);
+    let result = api.login(&email, &password).await?;
+
+    if result.two_factor_redirect {
+        let mut pending = state.pending_login.lock().await;
+        *pending = Some(PendingLogin {
+            api,
+            server_url,
+            email,
+        });
+        return Ok(LoginResult {
+            two_factor_required: true,
+        });
+    }
+
+    finish_login(&state, api, server_url, email).await?;
+    let mut pending = state.pending_login.lock().await;
+    *pending = None;
+
+    Ok(LoginResult {
+        two_factor_required: false,
+    })
+}
+
+#[tauri::command]
+async fn verify_two_factor(
+    state: tauri::State<'_, AppState>,
+    code: String,
+) -> Result<LoginResult, String> {
+    let pending = {
+        let mut lock = state.pending_login.lock().await;
+        lock.take()
+            .ok_or("Sesi 2FA tidak ditemukan. Silakan login ulang.")?
+    };
+
+    let code = code.trim().to_string();
+    if code.len() != 6 || !code.chars().all(|c| c.is_ascii_digit()) {
+        let mut lock = state.pending_login.lock().await;
+        *lock = Some(pending);
+        return Err("Kode 2FA harus 6 angka".to_string());
+    }
+
+    if let Err(e) = pending.api.verify_totp(&code).await {
+        let mut lock = state.pending_login.lock().await;
+        *lock = Some(pending);
+        return Err(e);
+    }
+
+    if let Err(e) = finish_login(
+        &state,
+        pending.api.clone(),
+        pending.server_url.clone(),
+        pending.email.clone(),
+    )
+    .await
+    {
+        let mut lock = state.pending_login.lock().await;
+        *lock = Some(pending);
+        return Err(e);
+    }
+
+    Ok(LoginResult {
+        two_factor_required: false,
+    })
 }
 
 #[tauri::command]
@@ -92,6 +173,10 @@ async fn logout(state: tauri::State<'_, AppState>) -> Result<String, String> {
     {
         let mut api_lock = state.engine.api.lock().await;
         *api_lock = None;
+    }
+    {
+        let mut pending = state.pending_login.lock().await;
+        *pending = None;
     }
 
     {
@@ -355,6 +440,7 @@ pub fn run() {
         engine: engine.clone(),
         config: Arc::new(Mutex::new(config)),
         watcher: Arc::new(Mutex::new(watcher::FileWatcher::new(engine.clone()))),
+        pending_login: Arc::new(Mutex::new(None)),
     };
 
     tauri::Builder::default()
@@ -371,6 +457,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             login,
+            verify_two_factor,
             logout,
             list_dms_folders,
             set_folder_target,
