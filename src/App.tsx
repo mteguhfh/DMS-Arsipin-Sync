@@ -3,6 +3,7 @@ import LoginPage from './components/LoginPage'
 import Dashboard from './components/Dashboard'
 import Settings from './components/Settings'
 import BrandLogo from './components/BrandLogo'
+import UpdateNotice from './components/UpdateNotice'
 import type { StatusData } from './types'
 import './App.css'
 
@@ -106,6 +107,7 @@ function App() {
           </div>
         </aside>
         <main className="main-content">
+          <UpdateNotice />
           {page === 'dashboard' && <Dashboard status={status} />}
           {page === 'settings' && <Settings onLogout={handleLogout} />}
         </main>

@@ -6,6 +6,8 @@
     "core:default",
     "shell:allow-open",
     "autostart:default",
-    "dialog:default"
+    "dialog:default",
+    "updater:default",
+    "process:default"
   ]
 }

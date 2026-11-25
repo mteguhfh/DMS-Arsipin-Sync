@@ -92,15 +92,34 @@ jobs:
 
       - name: Build Tauri app (Windows)
         if: runner.os == 'Windows'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build -- --target ${{ matrix.target }} --bundles msi,nsis
 
       - name: Build Tauri app (macOS)
         if: runner.os == 'macOS'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build -- --target ${{ matrix.target }} --bundles dmg
 
       - name: Build Tauri app (Linux)
         if: runner.os == 'Linux'
-        run: npm run tauri build -- --target ${{ matrix.target }} --bundles deb,rpm
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri build -- --target ${{ matrix.target }} --bundles deb,rpm,appimage
+
+      - name: Upload updater metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: updater-${{ matrix.name }}
+          path: |
+            src-tauri/target/**/release/bundle/**/*.sig
+            src-tauri/target/**/release/bundle/**/latest.json
+          compression-level: 0
+          if-no-files-found: error
 
       - name: Upload MSI (Windows)
         if: runner.os == 'Windows'
@@ -147,6 +166,15 @@ jobs:
           compression-level: 0
           if-no-files-found: error
 
+      - name: Upload AppImage (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: src-tauri/target/**/release/bundle/appimage/*.AppImage
+          compression-level: 0
+          if-no-files-found: error
+
   publish:
     name: Publish Release
     needs: build
@@ -161,6 +189,9 @@ jobs:
 
       - name: List artifacts
         run: find artifacts -type f | sort
+
+      - name: Merge updater manifests
+        run: node scripts/merge-updater-manifests.mjs artifacts
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -181,6 +212,7 @@ jobs:
             ### Linux
             - **Debian/Ubuntu:** `linux-deb/*.deb`
             - **Fedora/RHEL:** `linux-rpm/*.rpm`
+            - **AppImage (auto-update):** `linux-appimage/*.AppImage`
 
             ## 🚀 Cara Install
 
@@ -197,10 +229,16 @@ jobs:
             ```
           files: |
             artifacts/**/*.dmg
+            artifacts/**/*.dmg.sig
             artifacts/**/*.msi
+            artifacts/**/*.msi.sig
             artifacts/**/*.exe
+            artifacts/**/*.exe.sig
             artifacts/**/*.deb
             artifacts/**/*.rpm
+            artifacts/**/*.AppImage
+            artifacts/**/*.AppImage.sig
+            artifacts/latest.json
           fail_on_unmatched_files: true
           draft: false
           prerelease: false
