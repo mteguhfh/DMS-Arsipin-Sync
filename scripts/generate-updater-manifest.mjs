@@ -29,22 +29,26 @@ function pick(label, predicate) {
 const targets = [
   {
     platform: 'linux-x86_64',
+    target: 'x86_64-unknown-linux-gnu',
     asset: `DMS Sync_${version}_amd64.AppImage`,
     match: file => file.includes('x86_64-unknown-linux-gnu') && file.endsWith('.AppImage'),
   },
   {
     platform: 'windows-x86_64',
+    target: 'x86_64-pc-windows-msvc',
     asset: `DMS Sync_${version}_x64-setup.exe`,
     match: file =>
       file.includes('x86_64-pc-windows-msvc') && file.includes('/nsis/') && file.endsWith('-setup.exe'),
   },
   {
     platform: 'darwin-x86_64',
+    target: 'x86_64-apple-darwin',
     asset: `DMS Sync_${version}_x64.app.tar.gz`,
     match: file => file.includes('x86_64-apple-darwin') && file.endsWith('.app.tar.gz'),
   },
   {
     platform: 'darwin-aarch64',
+    target: 'aarch64-apple-darwin',
     asset: `DMS Sync_${version}_aarch64.app.tar.gz`,
     match: file => file.includes('aarch64-apple-darwin') && file.endsWith('.app.tar.gz'),
   },
@@ -55,10 +59,9 @@ await mkdir(outputDir, { recursive: true })
 const platforms = {}
 for (const target of targets) {
   const source = pick(target.platform, target.match)
-  const signatureFile = `${source}.sig`
-  if (!files.includes(signatureFile)) {
-    throw new Error(`Missing signature for ${source}`)
-  }
+  const signatureFile = pick(`${target.platform} signature`, file =>
+    file.includes(target.target) && path.basename(file) === `${path.basename(source)}.sig`,
+  )
 
   await copyFile(source, path.join(outputDir, target.asset))
   await copyFile(signatureFile, path.join(outputDir, `${target.asset}.sig`))
